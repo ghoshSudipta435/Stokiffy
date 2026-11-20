@@ -1,0 +1,640 @@
+// packages/db/prisma/schema.prisma
+// Prisma schema for Stokiffy PostgreSQL database
+// Follows SYSTEM_ARCHITECTURE.md, SECURITY_ARCHITECTURE.md, and ADR-004
+// Prisma Decimal type maps to PostgreSQL Numeric automatically
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// ============================================================
+// Multi-tenancy & core entities
+// ============================================================
+
+model User {
+  id        String   @id @default(cuid())
+  email     String   @unique
+  name      String?
+  role      String   @default("USER")
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  companies        Company[]
+  analysisRuns     AnalysisRun[]
+  flagOverrides    FlagOverride[]
+  tradePlans       TradePlan[]
+  journalEntries   JournalEntry[]
+  holdings         PortfolioHolding[]
+  transactions     Transaction[]
+  auditEvents      AuditEvent[]
+  alerts           Alert[] @relation("UserAlerts")
+  ingestionJobs    IngestionJob[]
+}
+
+model Company {
+  id          String   @id @default(cuid())
+  userId      String
+  symbol      String
+  name        String
+  isin        String?
+  sector      String
+  exchange    String
+  isActive    Boolean  @default(true)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  user             User                @relation(fields: [userId], references: [id])
+  financials       FinancialStatement[]
+  priceBars        PriceBar[]
+  corporateActions CorporateAction[]
+  shareholdings    Shareholding[]
+  analysisRuns     AnalysisRun[]
+  tradePlans       TradePlan[]
+  holdings         PortfolioHolding[]
+  alerts           Alert[] @relation("CompanyAlerts")
+  transactions     Transaction[]
+  dataSnapshots    DataSnapshot[]
+
+  @@index([userId])
+  @@index([symbol])
+  @@index([userId, symbol])
+}
+
+// ============================================================
+// Financial data (point-in-time)
+// ============================================================
+
+model FinancialStatement {
+  id                     String   @id @default(cuid())
+  companyId              String
+  periodType             String
+  fiscalYear             String
+  fiscalQuarter          String?
+  revenue                Decimal?
+  netProfit              Decimal?
+  operatingProfit        Decimal?
+  totalAssets            Decimal?
+  totalLiabilities       Decimal?
+  totalEquity            Decimal?
+  totalDebt              Decimal?
+  currentAssets          Decimal?
+  currentLiabilities     Decimal?
+  interestExpense        Decimal?
+  ebit                   Decimal?
+  eps                    Decimal?
+  depreciationAmortization Decimal?
+  capitalExpenditure     Decimal?
+  changeInWorkingCapital Decimal?
+  fcf                    Decimal?
+  dividendPerShare       Decimal?
+  sharesOutstanding      Decimal?
+  bookValuePerShare      Decimal?
+  promoterPledgePct      Decimal?
+  relatedPartyTxn        Decimal?
+  auditorQualification   String?
+  currency               String   @default("INR")
+  unit                   String   @default("CRORE")
+  adjustmentStatus       String   @default("reported")
+  quality                String   @default("verified")
+  isMissing              Boolean  @default(false)
+  sourceDocumentRef      String?
+  fetchedAt              DateTime
+  reportedPeriod         String
+  createdAt              DateTime @default(now())
+
+  company Company @relation(fields: [companyId], references: [id])
+
+  @@index([companyId])
+  @@index([companyId, periodType, fiscalYear, fiscalQuarter])
+  @@index([reportedPeriod])
+}
+
+// ============================================================
+// Price data (OHLCV)
+// ============================================================
+
+model PriceBar {
+  id               String   @id @default(cuid())
+  companyId        String
+  date             DateTime
+  open             Decimal
+  high             Decimal
+  low              Decimal
+  close            Decimal
+  volume           BigInt
+  adjusted         Boolean  @default(false)
+  corporateActionType String?
+  createdAt        DateTime @default(now())
+
+  company Company @relation(fields: [companyId], references: [id])
+
+  @@index([companyId])
+  @@index([companyId, date])
+  @@unique([companyId, date])
+}
+
+// ============================================================
+// Corporate actions
+// ============================================================
+
+model CorporateAction {
+  id          String   @id @default(cuid())
+  companyId   String
+  type        String
+  date        DateTime
+  ratio       String?
+  amount      Decimal?
+  createdAt   DateTime @default(now())
+
+  company Company @relation(fields: [companyId], references: [id])
+
+  @@index([companyId])
+  @@index([companyId, date])
+}
+
+// ============================================================
+// Shareholding
+// ============================================================
+
+model Shareholding {
+  id                String   @id @default(cuid())
+  companyId         String
+  period            String
+  promoterPct       Decimal
+  fiiPct            Decimal
+  diiPct            Decimal
+  publicPct         Decimal
+  promoterPledgePct Decimal?
+  dataQuality       String   @default("verified")
+  createdAt         DateTime @default(now())
+
+  company Company @relation(fields: [companyId], references: [id])
+
+  @@index([companyId])
+  @@index([companyId, period])
+}
+
+// ============================================================
+// Analysis runs (immutable snapshots)
+// ============================================================
+
+model AnalysisRun {
+  id             String   @id @default(cuid())
+  companyId      String
+  userId         String
+  stage          String
+  totalPoints    Decimal
+  maxPoints      Decimal
+  verdict        String
+  ruleSetVersion String
+  dataSnapshotId String
+  configHash     String
+  calculatedAt   DateTime @default(now())
+
+  company    Company   @relation(fields: [companyId], references: [id])
+  user       User      @relation(fields: [userId], references: [id])
+  stageA     AnalysisStageA?
+  stageB     AnalysisStageB?
+  stageC     AnalysisStageC?
+  stageD     AnalysisStageD?
+  stageE     AnalysisStageE?
+  stageF     AnalysisStageF?
+  stageG     AnalysisStageG?
+  redFlags   RedFlag[]
+
+  @@index([companyId])
+  @@index([userId])
+  @@index([companyId, stage])
+  @@index([ruleSetVersion])
+}
+
+model AnalysisStageA {
+  id                String   @id @default(cuid())
+  analysisRunId     String   @unique
+  sector            String
+  maxPossibleScore  Decimal
+  minPassScore      Decimal
+  bankVariant       Boolean   @default(false)
+  unsuitableRules   Json?
+
+  analysisRun AnalysisRun @relation(fields: [analysisRunId], references: [id], onDelete: Cascade)
+}
+
+model AnalysisStageB {
+  id                String   @id @default(cuid())
+  analysisRunId     String   @unique
+  quarterlySalesTrend    String
+  quarterlyOpmTrend      String
+  annualSales5yTrend     String
+  annualOpm5yTrend       String
+  netProfitTrend         String
+  reservesBorrowingsTrend String
+  cfoTrend              String
+  debtorDaysTrend       String
+  roceTrend             String
+  shareholdingScore     Decimal
+  shareholdingHardFlags Json
+
+  analysisRun AnalysisRun @relation(fields: [analysisRunId], references: [id], onDelete: Cascade)
+}
+
+model AnalysisStageC {
+  id             String   @id @default(cuid())
+  analysisRunId  String   @unique
+  moatScore      Decimal
+  moatPass       Boolean
+  businessModelComplete Boolean
+  overallConfidence String
+
+  analysisRun AnalysisRun @relation(fields: [analysisRunId], references: [id], onDelete: Cascade)
+}
+
+model AnalysisStageD {
+  id              String   @id @default(cuid())
+  analysisRunId   String   @unique
+  primaryMethod   String
+  fairValue       Decimal
+  valuationRangeLow  Decimal
+  valuationRangeHigh  Decimal
+  maxBuyPrice     Decimal
+  marginOfSafetyPct Decimal
+  buyReady        Boolean
+  confidence      String
+
+  analysisRun AnalysisRun @relation(fields: [analysisRunId], references: [id], onDelete: Cascade)
+}
+
+model AnalysisStageE {
+  id             String   @id @default(cuid())
+  analysisRunId  String   @unique
+  eligible       Boolean
+  currentPrice   Decimal
+  maxBuyPrice    Decimal
+  inBuyZone      Boolean
+  distanceToMaxBuyPct Decimal
+  dailyTrend     String
+  weeklyTrend    String
+  volumeProfile  String
+  rsVsBenchmark  String
+
+  analysisRun AnalysisRun @relation(fields: [analysisRunId], references: [id], onDelete: Cascade)
+}
+
+model AnalysisStageF {
+  id             String   @id @default(cuid())
+  analysisRunId  String   @unique
+  positionSize   Decimal
+  riskBudget     Decimal
+  portfolioExposurePct Decimal
+  sectorExposurePct Decimal
+  blocked        Boolean   @default(false)
+  ruleSetVersion String
+
+  analysisRun AnalysisRun @relation(fields: [analysisRunId], references: [id], onDelete: Cascade)
+}
+
+model AnalysisStageG {
+  id             String   @id @default(cuid())
+  analysisRunId  String   @unique
+  concentrationOk   Boolean
+  drawdownOk        Boolean
+  cashBufferOk      Boolean
+  correlationRisk   String
+
+  analysisRun AnalysisRun @relation(fields: [analysisRunId], references: [id], onDelete: Cascade)
+}
+
+// ============================================================
+// Red flags
+// ============================================================
+
+model RedFlag {
+  id                String   @id @default(cuid())
+  analysisRunId     String
+  companyId         String
+  flagKey           String
+  stage             String
+  ruleKey           String?
+  class             String
+  severity          String
+  status            String   @default("ACTIVE")
+  message           String
+  threshold         String
+  actualValue       Json
+  expectedValue     Json?
+  source            String
+  isOverride        Boolean   @default(false)
+  originalFlagId    String?
+  createdAt         DateTime @default(now())
+  acknowledgedAt    DateTime?
+  acknowledgedBy    String?
+  acknowledgedReason String?
+  overriddenAt      DateTime?
+  overriddenBy      String?
+  overrideReason    String?
+  resolvedAt        DateTime?
+  resolutionReason  String?
+
+  analysisRun AnalysisRun @relation(fields: [analysisRunId], references: [id], onDelete: Cascade)
+  overrides   FlagOverride[]
+
+  @@index([analysisRunId])
+  @@index([companyId])
+  @@index([status])
+  @@index([class])
+}
+
+// ============================================================
+// Flag overrides (audit trail)
+// ============================================================
+
+model FlagOverride {
+  id             String   @id @default(cuid())
+  flagId         String
+  userId         String
+  reason         String
+  decision       String
+  beforeState    Json
+  afterState     Json
+  createdAt      DateTime @default(now())
+
+  flag    RedFlag   @relation(fields: [flagId], references: [id], onDelete: Cascade)
+  user    User      @relation(fields: [userId], references: [id])
+
+  @@index([flagId])
+  @@index([userId])
+  @@index([decision])
+}
+
+// ============================================================
+// Trade plans
+// ============================================================
+
+model TradePlan {
+  id                 String   @id @default(cuid())
+  companyId          String
+  userId             String
+  symbol             String
+  thesis             String
+  expectedHoldingPeriod String
+  entryRationale     String
+  entryZoneLow       Decimal
+  entryZoneHigh      Decimal
+  stopLoss           Decimal
+  targets            Json
+  positionSize       Decimal
+  entryPriceEst      Decimal
+  riskBudget         Decimal
+  plannedLossAtStop  Decimal
+  portfolioExposurePct Decimal
+  sectorExposurePct  Decimal
+  cashRemaining      Decimal
+  status             String
+  blocked            Boolean   @default(false)
+  ruleSetVersion     String
+  valuationMaxBuyPrice Decimal
+  technicalSetupId   String
+  createdAt          DateTime @default(now())
+  updatedAt          DateTime @updatedAt
+  createdBy          String
+  executedAt         DateTime?
+  executedPrice      Decimal?
+  executedQuantity   Decimal?
+
+  company    Company   @relation(fields: [companyId], references: [id])
+  user       User      @relation(fields: [userId], references: [id])
+  overrides  TradePlanOverride[]
+  journal    JournalEntry[]
+  transactions Transaction[]
+
+  @@index([userId])
+  @@index([companyId])
+  @@index([status])
+}
+
+// ============================================================
+// Trade plan overrides
+// ============================================================
+
+model TradePlanOverride {
+  id           String   @id @default(cuid())
+  tradePlanId  String
+  flagId       String
+  reason       String
+  overriddenBy String
+  beforeState  Json
+  afterState   Json
+  createdAt    DateTime @default(now())
+
+  tradePlan TradePlan @relation(fields: [tradePlanId], references: [id], onDelete: Cascade)
+
+  @@index([tradePlanId])
+}
+
+// ============================================================
+// Portfolio holdings
+// ============================================================
+
+model PortfolioHolding {
+  id             String   @id @default(cuid())
+  userId         String
+  companyId      String
+  symbol         String
+  quantity       Decimal
+  avgPrice       Decimal
+  currentPrice   Decimal
+  marketValue    Decimal
+  sector         String
+  unrealisedPnl  Decimal
+  unrealisedPnlPct Decimal
+  stopLoss       Decimal
+  targets        Json
+  entryDate      DateTime
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  user       User     @relation(fields: [userId], references: [id])
+  company    Company  @relation(fields: [companyId], references: [id])
+
+  @@index([userId])
+  @@index([companyId])
+}
+
+// ============================================================
+// Transactions (journal ledger)
+// ============================================================
+
+model Transaction {
+  id          String   @id @default(cuid())
+  userId      String?
+  companyId   String
+  tradePlanId String?
+  action      String
+  quantity    Decimal
+  price       Decimal
+  fees        Decimal   @default(0)
+  taxes       Decimal   @default(0)
+  reason      String
+  idempotencyKey String @unique
+  createdAt   DateTime @default(now())
+
+  user      User?     @relation(fields: [userId], references: [id], onDelete: SetNull)
+  company   Company   @relation(fields: [companyId], references: [id])
+  tradePlan TradePlan? @relation(fields: [tradePlanId], references: [id], onDelete: SetNull)
+
+  @@index([userId])
+  @@index([companyId])
+  @@index([idempotencyKey])
+}
+
+// ============================================================
+// Journal entries
+// ============================================================
+
+model JournalEntry {
+  id            String   @id @default(cuid())
+  tradePlanId   String
+  userId        String
+  date          DateTime
+  action        String
+  quantity      Decimal
+  price         Decimal
+  fees          Decimal   @default(0)
+  taxes         Decimal   @default(0)
+  reason        String
+  ruleTriggers  Json
+  realisedPnl   Decimal?
+  unrealisedPnl Decimal?
+  returnPct     Decimal?
+  corporateActions Json?
+  reviewedAt    DateTime?
+  reviewedBy    String?
+  createdAt     DateTime @default(now())
+
+  tradePlan TradePlan @relation(fields: [tradePlanId], references: [id], onDelete: Cascade)
+  user      User      @relation(fields: [userId], references: [id])
+
+  @@index([tradePlanId])
+  @@index([userId])
+  @@index([date])
+}
+
+// ============================================================
+// Alerts
+// ============================================================
+
+model Alert {
+  id               String   @id @default(cuid())
+  userId           String?
+  companyId        String?
+  type             String
+  severity         String
+  message          String
+  triggeredAt      DateTime
+  acknowledgedAt   DateTime?
+  acknowledgedBy   String?
+  data             Json
+  relatedTradePlanId String?
+
+  user     User?     @relation("UserAlerts", fields: [userId], references: [id], onDelete: SetNull)
+  company  Company?  @relation("CompanyAlerts", fields: [companyId], references: [id], onDelete: SetNull)
+
+  @@index([userId])
+  @@index([companyId])
+  @@index([triggeredAt])
+  @@index([severity])
+}
+
+// ============================================================
+// Audit events (immutable, append-only)
+// ============================================================
+
+model AuditEvent {
+  id          String   @id @default(cuid())
+  userId      String
+  action      String
+  entityType  String
+  entityId    String
+  beforeState Json?
+  afterState  Json?
+  reason      String
+  ipAddress   String?
+  userAgent   String?
+  createdAt   DateTime @default(now())
+
+  user User @relation(fields: [userId], references: [id])
+
+  @@index([userId])
+  @@index([entityType, entityId])
+  @@index([action])
+  @@index([createdAt])
+}
+
+// ============================================================
+// Data snapshots (for reproducibility)
+// ============================================================
+
+model DataSnapshot {
+  id          String   @id @default(cuid())
+  companyId   String
+  asOfDate    DateTime
+  financials  Json
+  marketData  Json
+  provenance  Json
+  capturedAt  DateTime @default(now())
+
+  company Company @relation(fields: [companyId], references: [id])
+
+  @@index([companyId])
+  @@index([asOfDate])
+}
+
+// ============================================================
+// Ingestion jobs (durable job processing)
+// ============================================================
+
+model IngestionJob {
+  id               String   @id @default(cuid())
+  userId           String
+  status           String   @default("QUEUED")
+  failureCategory  String?
+  storageProvider  String   @default("local")
+  storageKey       String
+  originalFilename String?
+  fileSizeBytes    Int?
+  mimeType         String?
+  sha256Hash       String?
+  attemptCount     Int      @default(0)
+  retryLimit       Int      @default(3)
+  leaseOwner       String?
+  leaseToken       String?
+  leaseExpiresAt   DateTime?
+  lastHeartbeatAt  DateTime?
+  nextRetryAt      DateTime?
+  processedRows    Int      @default(0)
+  acceptedRows     Int      @default(0)
+  rejectedRows     Int      @default(0)
+  totalRows        Int?
+  errorSummary     String?
+  objectDeleted    Boolean  @default(false)
+  objectDeletedAt  DateTime?
+  retentionExpiresAt DateTime?
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+  startedAt        DateTime?
+  completedAt      DateTime?
+  failedAt         DateTime?
+
+  user User @relation(fields: [userId], references: [id])
+
+  @@index([userId])
+  @@index([userId, status])
+  @@index([nextRetryAt])
+  @@index([objectDeleted])
+  @@index([userId, sha256Hash])
+}
