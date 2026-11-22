@@ -1,17 +1,52 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useState, useCallback } from 'react';
 import Link from 'next/link';
 import {
   Search,
   UploadCloud,
   FileSpreadsheet,
+  FileText,
   RefreshCw,
   Info,
+  Play,
+  Loader2,
+  ShieldAlert,
+  ShieldCheck,
+  Plus,
 } from 'lucide-react';
 import { useScreener } from '@/hooks/use-screener';
 import { useFlags } from '@/hooks/use-flags';
+import { useStageARun } from '@/hooks/use-stage-a-run';
 import { RedFlagIndicator } from '@/components/shared/red-flag-indicator';
+import { ScoreBadge } from '@/components/shared/score-badge';
+import { AddCompanyModal } from '@/components/company/add-company-modal';
+
+const FINANCIALS_TEMPLATE_HEADER =
+  'symbol,periodType,fiscalYear,fiscalQuarter,revenue,operatingProfit,netProfit,eps,equity,totalDebt,currentAssets,currentLiabilities,interestExpense,ebit,totalAssets,cfo,fcf,debtorDays';
+
+const FINANCIALS_TEMPLATE_ROWS = [
+  'TCS,Annual,FY2024,,612000,148000,138000,370,190000,8000,140000,60000,400,148400,285000,129000,129000,',
+  'HINDUNILVR,Annual,FY2024,,530000,105000,92000,380,70000,5000,70000,50000,200,105200,140000,99000,99000,',
+];
+
+function downloadCsv(filename: string, csvContent: string) {
+  const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+  const url = URL.createObjectURL(blob);
+  const link = document.createElement('a');
+  link.setAttribute('href', url);
+  link.setAttribute('download', filename);
+  link.style.visibility = 'hidden';
+  document.body.appendChild(link);
+  link.click();
+  document.body.removeChild(link);
+  URL.revokeObjectURL(url);
+}
+
+function downloadFinancialsTemplate() {
+  const lines = [FINANCIALS_TEMPLATE_HEADER, ...FINANCIALS_TEMPLATE_ROWS];
+  downloadCsv('stokiffy-financials-template.csv', lines.join('\n'));
+}
 
 export default function ScreenerPage() {
   const [searchTerm, setSearchTerm] = useState('');
@@ -19,6 +54,9 @@ export default function ScreenerPage() {
   const [activeTab, setActiveTab] = useState<'ALL' | 'FLAGS'>('ALL');
   const [isUploading, setIsUploading] = useState(false);
   const [uploadStatus, setUploadStatus] = useState<string | null>(null);
+  const [runningStageA, setRunningStageA] = useState<Set<string>>(new Set());
+  const [stageAResults, setStageAResults] = useState<Map<string, any>>(new Map());
+  const [addCompanyOpen, setAddCompanyOpen] = useState(false);
 
   const { data: companiesData, isLoading, refetch } = useScreener({
     q: searchTerm || undefined,
@@ -26,6 +64,33 @@ export default function ScreenerPage() {
   });
 
   const { data: flagsData } = useFlags();
+
+  const { runStageA: runStageAMutation, isRunning: isStageARunning } = useStageARun();
+
+  const handleRunStageA = useCallback(
+    async (companyId: string, symbol: string) => {
+      setRunningStageA((prev) => new Set([...prev, companyId]));
+      try {
+        const result = await runStageAMutation({ companyId, symbol });
+        setStageAResults((prev) => new Map(prev).set(companyId, result));
+        refetch();
+      } catch {
+        // Error surface handled by API route
+      } finally {
+        setRunningStageA((prev) => {
+          const next = new Set(prev);
+          next.delete(companyId);
+          return next;
+        });
+      }
+    },
+    [runStageAMutation, refetch]
+  );
+
+  const handleAddCompanySuccess = useCallback(() => {
+    refetch();
+    setAddCompanyOpen(false);
+  }, [refetch]);
 
   const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -59,16 +124,30 @@ export default function ScreenerPage() {
 
   const companies = companiesData?.data || [];
 
+  const getVerdictBadge = (verdictBand: string | undefined) => {
+    switch (verdictBand) {
+      case 'EXCEPTIONAL':
+        return 'bg-emerald-500/10 text-emerald-400 border-emerald-500/30';
+      case 'EXCELLENT':
+        return 'bg-emerald-500/10 text-emerald-400 border-emerald-500/30';
+      case 'GOOD':
+        return 'bg-cyan-500/10 text-cyan-400 border-cyan-500/30';
+      case 'AVOID':
+      default:
+        return 'bg-slate-800 text-slate-400 border-slate-700';
+    }
+  };
+
   return (
     <div className="space-y-6">
       {/* Page Header */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-4 border-b border-slate-800">
         <div>
           <h1 className="text-xl font-bold tracking-tight text-slate-100">
-            Screening & Research Workstation (UI Shell)
+            Screening & Research Workstation
           </h1>
           <p className="text-xs text-slate-400 mt-1">
-            Data table scaffolding and CSV staging. Financial calculation engines are in packages/core.
+            Run Stage A screening on tracked companies. Results persist to PostgreSQL and power the Company Research page.
           </p>
         </div>
 
@@ -85,19 +164,20 @@ export default function ScreenerPage() {
               disabled={isUploading}
             />
           </label>
-        </div>
-      </div>
-
-      {/* Scope Notice */}
-      <div className="p-4 rounded-lg bg-slate-900 border border-slate-800 flex items-start gap-3">
-        <Info className="w-4 h-4 text-cyan-400 flex-shrink-0 mt-0.5" />
-        <div className="text-xs text-slate-300">
-          <strong className="text-slate-100">Policy & Engine Status Notice:</strong>
-          <p className="mt-1 text-slate-400">
-            Stage A market cap thresholds (Decision 1), liquidity cutoffs (Decision 2), promoter pledge limits (Decision 3),
-            minimum ROCE (Decision 4), and maximum debt-to-equity (Decision 5) are strictly PENDING USER DECISION.
-            Companies listed below are demonstration fixtures for layout validation.
-          </p>
+          <button
+            onClick={() => setAddCompanyOpen(true)}
+            className="px-3 py-1.5 rounded bg-slate-700 hover:bg-slate-600 text-slate-200 font-semibold text-xs transition-colors border border-slate-600"
+          >
+            <Plus className="w-3.5 h-3.5 mr-1.5" />
+            Add Company
+          </button>
+          <button
+            onClick={downloadFinancialsTemplate}
+            className="px-3 py-1.5 rounded bg-slate-700 hover:bg-slate-600 text-slate-200 font-semibold text-xs transition-colors border border-slate-600"
+          >
+            <FileText className="w-3.5 h-3.5 mr-1.5" />
+            Download Financials Template
+          </button>
         </div>
       </div>
 
@@ -174,10 +254,10 @@ export default function ScreenerPage() {
         <div className="space-y-4">
           <div className="p-4 rounded-lg bg-slate-900 border border-slate-800">
             <h2 className="text-sm font-bold text-slate-200 mb-1">
-              Active Audit Flags Register (Neutral Technical View)
+              Active Audit Flags Register
             </h2>
             <p className="text-xs text-slate-400 mb-4">
-              Presents logged flag items. Flag override and acknowledgment policies remain pending user decision.
+              Flags persisted from Stage A runs. Use the Company Research page to acknowledge or override flags.
             </p>
 
             <div className="space-y-3">
@@ -203,7 +283,7 @@ export default function ScreenerPage() {
                     </div>
 
                     <span className="px-2 py-0.5 rounded bg-slate-800 text-slate-400 text-[10px] font-mono">
-                      Demonstration Item
+                      Persisted
                     </span>
                   </div>
                 </div>
@@ -222,54 +302,105 @@ export default function ScreenerPage() {
                   <th className="py-3 px-4">Company Name</th>
                   <th className="py-3 px-4">Exchange</th>
                   <th className="py-3 px-4">Sector</th>
-                  <th className="py-3 px-4 text-center">Stage A Status</th>
-                  <th className="py-3 px-4 text-center">Engine Integration</th>
+                  <th className="py-3 px-4 text-center">Stage A Score</th>
+                  <th className="py-3 px-4 text-center">Verdict</th>
+                  <th className="py-3 px-4 text-center">Hard Flags</th>
+                  <th className="py-3 px-4 text-center">Stage B</th>
+                  <th className="py-3 px-4 text-center">Action</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-800/60 font-mono">
                 {isLoading ? (
                   <tr>
-                    <td colSpan={6} className="py-8 text-center text-slate-400">
-                      Loading tracked fixtures...
+                    <td colSpan={9} className="py-8 text-center text-slate-400">
+                      Loading tracked companies...
                     </td>
                   </tr>
                 ) : companies.length === 0 ? (
                   <tr>
-                    <td colSpan={6} className="py-8 text-center text-slate-400">
+                    <td colSpan={9} className="py-8 text-center text-slate-400">
                       No companies match the current filter criteria.
                     </td>
                   </tr>
                 ) : (
-                  companies.map((c) => (
-                    <tr
-                      key={c.id}
-                      className="hover:bg-slate-800/40 transition-colors cursor-pointer"
-                    >
-                      <td className="py-3 px-4 font-bold text-cyan-400">
-                        <Link href={`/companies/${c.symbol}`} className="hover:underline">
-                          {c.symbol}
-                        </Link>
-                      </td>
-                      <td className="py-3 px-4 font-sans text-slate-200">
-                        {c.name}
-                      </td>
-                      <td className="py-3 px-4 text-slate-400">{c.exchange}</td>
-                      <td className="py-3 px-4 font-sans text-slate-400">{c.sector}</td>
-                      <td className="py-3 px-4 text-center">
-                        <span className="px-2 py-0.5 rounded bg-slate-800 text-slate-400 text-[10px]">
-                          NOT_EVALUATED
-                        </span>
-                      </td>
-                      <td className="py-3 px-4 text-center text-amber-400 text-[10px]">
-                        PENDING_CORE_ENGINE
-                      </td>
-                    </tr>
-                  ))
+                  companies.map((c) => {
+                    const isRunning = runningStageA.has(c.id);
+                    const result = stageAResults.get(c.id);
+                    const scoreText = result
+                      ? `${result.totalPoints} / ${result.maxPoints}`
+                      : 'NOT_EVALUATED';
+                    const verdictText = result
+                      ? result.verdictBand
+                      : '—';
+                    const hardFlags = result ? result.hardStopCount : c.activeFlagsCount || 0;
+                    const stageB = result
+                      ? (result.canProceedToStageB ? 'ELIGIBLE' : 'BLOCKED')
+                      : 'BLOCKED';
+
+                    return (
+                      <tr
+                        key={c.id}
+                        className="hover:bg-slate-800/40 transition-colors cursor-pointer"
+                      >
+                        <td className="py-3 px-4 font-bold text-cyan-400">
+                          <Link href={`/companies/${c.symbol}`} className="hover:underline">
+                            {c.symbol}
+                          </Link>
+                        </td>
+                        <td className="py-3 px-4 font-sans text-slate-200">
+                          {c.name}
+                        </td>
+                        <td className="py-3 px-4 text-slate-400">{c.exchange}</td>
+                        <td className="py-3 px-4 font-sans text-slate-400">{c.sector}</td>
+                        <td className="py-3 px-4 text-center">
+                          <span className={`px-2 py-0.5 rounded text-[10px] font-mono font-semibold ${getVerdictBadge(result?.verdictBand)}`}>
+                            {scoreText}
+                          </span>
+                        </td>
+                        <td className="py-3 px-4 text-center">
+                          <span className={`px-2 py-0.5 rounded text-[10px] font-mono font-semibold ${getVerdictBadge(result?.verdictBand)}`}>
+                            {verdictText}
+                          </span>
+                        </td>
+                        <td className="py-3 px-4 text-center">
+                          <span className={`px-2 py-0.5 rounded text-[10px] font-mono ${hardFlags > 0 ? 'bg-red-500/10 text-red-400 border border-red-500/30' : 'bg-slate-800 text-slate-400 border border-slate-700'}`}>
+                            {hardFlags}
+                          </span>
+                        </td>
+                        <td className="py-3 px-4 text-center">
+                          <span className={`px-2 py-0.5 rounded text-[10px] font-mono ${stageB === 'ELIGIBLE' ? 'bg-emerald-500/10 text-emerald-400 border-emerald-500/30' : 'bg-red-500/10 text-red-400 border-red-500/30'}`}>
+                            {stageB}
+                          </span>
+                        </td>
+                        <td className="py-3 px-4 text-center">
+                          {isRunning ? (
+                            <Loader2 className="w-4 h-4 text-cyan-400 animate-spin" />
+                          ) : (
+                            <button
+                              onClick={() => handleRunStageA(c.id, c.symbol)}
+                              disabled={isStageARunning}
+                              className="px-2.5 py-1 rounded bg-slate-700 hover:bg-slate-600 text-slate-200 text-[10px] font-semibold transition-colors border border-slate-600"
+                            >
+                              <Play className="w-3 h-3 mr-1" />
+                              Run Stage A
+                            </button>
+                          )}
+                        </td>
+                      </tr>
+                    );
+                  })
                 )}
               </tbody>
             </table>
           </div>
         </div>
+      )}
+      {addCompanyOpen && (
+        <AddCompanyModal
+          isOpen={addCompanyOpen}
+          onClose={() => setAddCompanyOpen(false)}
+          onSuccess={handleAddCompanySuccess}
+        />
       )}
     </div>
   );

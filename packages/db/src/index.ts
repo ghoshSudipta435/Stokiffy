@@ -31,6 +31,15 @@ export {
   AuditRepository,
 } from './repositories/audit-repository.js';
 export {
+  WatchlistRepository,
+} from './repositories/watchlist-repository.js';
+export {
+  RuleSetRepository,
+} from './repositories/rule-set-repository.js';
+export {
+  JournalRepository,
+} from './repositories/journal-repository.js';
+export {
   IngestionJobRepository,
   REUSABLE_STATUSES,
   TERMINAL_STATUSES,

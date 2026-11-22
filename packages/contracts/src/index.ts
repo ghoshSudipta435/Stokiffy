@@ -52,6 +52,7 @@ export {
   PriceBarSchema,
   CorporateActionSchema,
   ShareholdingPointSchema,
+  RedFlagSchema,
 } from './models/index.js';
 export type {
   DataProvenance,
@@ -61,6 +62,7 @@ export type {
   PriceBar,
   CorporateAction,
   ShareholdingPoint,
+  RedFlag,
 } from './models/index.js';
 
 // API common
@@ -132,14 +134,92 @@ export type {
   StageAExecutionStatus,
 } from './api/analyses.js';
 
-// API trade plans
+// API watchlists
 export {
+  WatchlistItemSchema,
+  WatchlistSchema,
+  CreateWatchlistRequestSchema,
+  UpdateWatchlistRequestSchema,
+  AddWatchlistItemRequestSchema,
+  UpdateWatchlistItemRequestSchema,
+  WatchlistResponseSchema,
+  ListWatchlistsResponseSchema,
+  WatchlistItemResponseSchema,
+  WatchlistComparisonItemSchema,
+  WatchlistComparisonResponseSchema,
+} from './api/watchlists.js';
+export type {
+  WatchlistItem,
+  Watchlist,
+  CreateWatchlistRequest,
+  UpdateWatchlistRequest,
+  AddWatchlistItemRequest,
+  UpdateWatchlistItemRequest,
+  WatchlistResponse,
+  ListWatchlistsResponse,
+  WatchlistItemResponse,
+  WatchlistComparisonItem,
+  WatchlistComparisonResponse,
+} from './api/watchlists.js';
+
+// API rule sets & benchmarks
+export {
+  IndustryBenchmarkSchema,
+  RiskLimitsSchema,
+  RuleSetSchema,
+  UpsertRuleSetDraftRequestSchema,
+  PublishRuleSetRequestSchema,
+  BenchmarkItemInputSchema,
+  UpdateBenchmarksRequestSchema,
+  UpdateRiskLimitsRequestSchema,
+  RuleSetResponseSchema,
+  ListRuleSetsResponseSchema,
+  BenchmarksResponseSchema,
+} from './api/rule-sets.js';
+export type {
+  IndustryBenchmark,
+  RiskLimits,
+  RuleSet,
+  UpsertRuleSetDraftRequest,
+  PublishRuleSetRequest,
+  BenchmarkItemInput,
+  UpdateBenchmarksRequest,
+  UpdateRiskLimitsRequest,
+  RuleSetResponse,
+  ListRuleSetsResponse,
+  BenchmarksResponse,
+} from './api/rule-sets.js';
+
+// API trade plans & Stage F
+export {
+  RiskCheckTypeSchema,
+  RiskCheckResultSchema,
+  OverrideRecordSchema,
+  PositionSizingResultSchema,
+  TradePlanFullSchema,
   CreateTradePlanRequestSchema,
+  UpdateTradePlanRequestSchema,
+  TradePlanOverrideRequestSchema,
+  StageFInputSchema,
+  StageFOutputSchema,
   TradePlanResponseSchema,
+  StageFResponseSchema,
+  ListTradePlansResponseSchema,
 } from './api/trade-plans.js';
 export type {
+  RiskCheckType,
+  RiskCheckResult,
+  OverrideRecord,
+  PositionSizingResult,
+  TradePlanFull,
   CreateTradePlanRequest,
+  UpdateTradePlanRequest,
+  TradePlanOverrideRequest,
+  StageFInput,
+  StageFOutput,
   TradePlanResponse,
+  StageFResponse,
+  ListTradePlansResponse,
 } from './api/trade-plans.js';
 
 // API portfolio
@@ -154,15 +234,65 @@ export type {
   TransactionRequest,
 } from './api/portfolio.js';
 
-// API valuations
+// API valuations & Stage D
 export {
+  StageDFinancialsSchema,
+  ValuationMethodResultSchema,
+  StageDInputSchema,
   ValuationRequestSchema,
+  StageDOutputSchema,
+  StageDResponseSchema,
   ValuationResponseSchema,
 } from './api/valuations.js';
 export type {
+  StageDFinancials,
+  ValuationMethodResult,
+  StageDInput,
   ValuationRequest,
+  StageDOutput,
+  StageDResponse,
   ValuationResponse,
 } from './api/valuations.js';
+
+// API monitoring & Stage G
+export {
+  AlertTypeSchema,
+  AlertSchema,
+  AcknowledgeAlertRequestSchema,
+  ListAlertsQuerySchema,
+  CorporateActionRecordSchema,
+  PostTradeReviewSchema,
+  JournalEntrySchema,
+  CreateJournalEntryRequestSchema,
+  AppendJournalReviewRequestSchema,
+  SellDecisionSchema,
+  StageGInputSchema,
+  StageGOutputSchema,
+  AlertResponseSchema,
+  AlertsResponseSchema,
+  JournalEntryResponseSchema,
+  JournalEntriesResponseSchema,
+  StageGResponseSchema,
+} from './api/monitoring.js';
+export type {
+  AlertType,
+  Alert,
+  AcknowledgeAlertRequest,
+  ListAlertsQuery,
+  CorporateActionRecord,
+  PostTradeReview,
+  JournalEntry,
+  CreateJournalEntryRequest,
+  AppendJournalReviewRequest,
+  SellDecision,
+  StageGInput,
+  StageGOutput,
+  AlertResponse,
+  AlertsResponse,
+  JournalEntryResponse,
+  JournalEntriesResponse,
+  StageGResponse,
+} from './api/monitoring.js';
 
 // API ingestion
 export {

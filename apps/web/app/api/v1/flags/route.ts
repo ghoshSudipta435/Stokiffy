@@ -1,7 +1,9 @@
 import { NextRequest } from 'next/server';
 import { z } from 'zod';
 import { apiHandler } from '@/lib/api-handler';
-import { createPaginatedResponse } from '@/lib/api-response';
+import { createPaginatedResponse, createErrorResponse } from '@/lib/api-response';
+import { requireAuth } from '@/lib/auth';
+import { prisma } from '@stock-assistant/db';
 
 export const dynamic = 'force-dynamic';
 
@@ -36,69 +38,64 @@ export interface RedFlagDTO {
   };
 }
 
-// Clearly identified demonstration fixtures for technical UI rendering
-const DEMO_FLAGS: RedFlagDTO[] = [
-  {
-    id: 'flg_01',
-    companyId: 'comp_demo_01',
-    symbol: 'DEMOCORP',
-    companyName: 'Demonstration Equities Ltd.',
-    category: 'GOVERNANCE_FINANCIAL_STRUCTURE',
-    code: 'WARN_SUBSIDIARY_LEVERAGE',
-    title: 'Subsidiary Leverage Disparity (Demonstration Flag)',
-    severity: 'WARNING',
-    status: 'ACTIVE',
-    detectedAt: new Date(Date.now() - 36 * 3600 * 1000).toISOString(),
-    isDemoData: true,
-    evidence: {
-      indicator: 'Consolidated vs Standalone Debt Disparity',
-      description: 'Demonstration evidence item for UI layout verification only.',
-      sourceDocument: 'FY24 Demonstration Note',
-    },
-  },
-  {
-    id: 'flg_02',
-    companyId: 'comp_demo_02',
-    symbol: 'AUDITDEMO',
-    companyName: 'Sample Audit Review Ltd.',
-    category: 'AUDIT_INTEGRITY',
-    code: 'HARD_AUDITOR_QUALIFIED_OPINION',
-    title: 'Auditor Qualified Opinion (Demonstration Flag)',
-    severity: 'HARD',
-    status: 'ACTIVE',
-    detectedAt: new Date(Date.now() - 72 * 3600 * 1000).toISOString(),
-    isDemoData: true,
-    evidence: {
-      indicator: 'Statutory Audit Report Opinion',
-      description: 'Demonstration evidence item for UI layout verification only.',
-      sourceDocument: 'Q2 Demonstration Review',
-    },
-  },
-];
-
 export const GET = apiHandler(async (req: NextRequest, { requestId }) => {
+  const session = await requireAuth(req);
+  const userId = session.user.id;
+
   const searchParams = Object.fromEntries(req.nextUrl.searchParams.entries());
   const parsed = querySchema.parse(searchParams);
 
-  let filtered = [...DEMO_FLAGS];
+  const userCompanies = await prisma.company.findMany({
+    where: { userId },
+    select: { id: true },
+  });
+  const userCompanyIds = userCompanies.map((c) => c.id);
 
-  if (parsed.companyId) {
-    filtered = filtered.filter((f) => f.companyId === parsed.companyId);
-  }
-  if (parsed.severity) {
-    filtered = filtered.filter((f) => f.severity === parsed.severity);
-  }
-  if (parsed.status) {
-    filtered = filtered.filter((f) => f.status === parsed.status);
-  }
+  const flags = await prisma.redFlag.findMany({
+    where: {
+      companyId: { in: userCompanyIds },
+      ...(parsed.companyId ? { companyId: parsed.companyId } : {}),
+      ...(parsed.severity ? { severity: parsed.severity } : {}),
+      ...(parsed.status ? { status: parsed.status } : {}),
+    },
+    include: { analysisRun: { include: { company: true } } },
+    take: parsed.limit,
+    orderBy: { createdAt: 'desc' },
+  });
+
+  const data: RedFlagDTO[] = flags.map((flag) => {
+    const company = flag.analysisRun.company;
+    const dto: RedFlagDTO = {
+      id: flag.id,
+      companyId: flag.companyId,
+      symbol: company.symbol,
+      companyName: company.name,
+      category: flag.class,
+      code: flag.flagKey,
+      title: flag.message,
+      severity: flag.severity as 'HARD' | 'WARNING',
+      status: flag.status as 'ACTIVE' | 'ACKNOWLEDGED' | 'RESOLVED',
+      detectedAt: flag.createdAt.toISOString(),
+      isDemoData: false,
+      evidence: {
+        indicator: flag.ruleKey ?? flag.flagKey,
+        description: flag.message,
+        sourceDocument: flag.source,
+      },
+    };
+    if (flag.acknowledgedAt) {
+      dto.acknowledgment = {
+        acknowledgedBy: flag.acknowledgedBy ?? '',
+        acknowledgedAt: flag.acknowledgedAt.toISOString(),
+        reason: flag.acknowledgedReason ?? '',
+      };
+    }
+    return dto;
+  });
 
   return createPaginatedResponse(
-    filtered,
-    {
-      limit: parsed.limit,
-      hasMore: false,
-      totalCount: filtered.length,
-    },
+    data,
+    { limit: parsed.limit, hasMore: false, totalCount: data.length },
     requestId
   );
 });

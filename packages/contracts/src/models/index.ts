@@ -9,6 +9,9 @@ import {
   AdjustmentStatusSchema,
   PeriodTypeSchema,
   CorporateActionTypeSchema,
+  FlagSeveritySchema,
+  FlagStatusSchema,
+  FlagClassSchema,
 } from '../enums/index.js';
 
 // Common reusable schemas
@@ -151,3 +154,36 @@ export const ShareholdingPointSchema = z.object({
   createdAt: z.string().datetime(),
 });
 export type ShareholdingPoint = z.infer<typeof ShareholdingPointSchema>;
+
+// Red flag
+export const RedFlagSchema = z.object({
+  id: z.string(),
+  flagKey: z.string(),
+  stage: z.enum(['A', 'B', 'C', 'D', 'E', 'F', 'G']),
+  ruleKey: z.string().optional(),
+  message: z.string(),
+  threshold: z.string(),
+  actualValue: z.unknown(),
+  expectedValue: z.unknown().optional(),
+  source: z.enum([
+    'handwritten-notes',
+    'blueprint',
+    'engineering-default',
+    'user-configured',
+  ]),
+  severity: FlagSeveritySchema,
+  status: FlagStatusSchema,
+  class: FlagClassSchema,
+  companyId: z.string(),
+  analysisRunId: z.string().optional(),
+  ruleSetVersion: z.string(),
+  dataSnapshotId: z.string().optional(),
+  isOverride: z.boolean().default(false),
+  createdAt: z.string().datetime(),
+  acknowledgedAt: z.string().datetime().optional(),
+  acknowledgedBy: z.string().optional(),
+  overriddenAt: z.string().datetime().optional(),
+  overriddenBy: z.string().optional(),
+  overrideReason: z.string().optional(),
+});
+export type RedFlag = z.infer<typeof RedFlagSchema>;

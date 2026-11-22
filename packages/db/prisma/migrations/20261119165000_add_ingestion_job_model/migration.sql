@@ -5,7 +5,7 @@
 
 -- Create table
 CREATE TABLE "IngestionJob" (
-    "id" TEXT NOT NULL DEFAULT cuid(),
+    "id" TEXT NOT NULL,
     "userId" TEXT NOT NULL,
     "status" TEXT NOT NULL DEFAULT 'QUEUED',
     "failureCategory" TEXT,
@@ -53,7 +53,7 @@ CREATE INDEX "IngestionJob_userId_sha256Hash_idx" ON "IngestionJob"("userId", "s
 -- Partial unique index for reusable ingestion jobs
 -- Prevents duplicate QUEUED/PROCESSING/VALIDATING/COMPLETED jobs for same user+hash
 -- Failed jobs do NOT block re-upload (excluded from partial index predicate)
-CREATE UNIQUE INDEX CONCURRENTLY 
+CREATE UNIQUE INDEX 
 "IngestionJob_userId_sha256Hash_reusable_unique" 
 ON "IngestionJob" ("userId", "sha256Hash") 
 WHERE "status" IN ('QUEUED', 'PROCESSING', 'VALIDATING', 'COMPLETED');

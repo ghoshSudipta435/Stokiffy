@@ -20,7 +20,8 @@
     "test": "vitest run",
     "typecheck": "tsc --noEmit",
     "prisma:generate": "prisma generate",
-    "prisma:validate": "prisma validate"
+    "prisma:validate": "prisma validate",
+    "db:seed": "vite-node prisma/seeds/seed.ts"
   },
   "dependencies": {
     "@prisma/client": "^5.10.0",

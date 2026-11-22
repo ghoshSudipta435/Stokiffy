@@ -11,9 +11,7 @@ export interface ScheduledJobDef {
 }
 
 /**
- * Recurring Technical Schedules
- * Strictly schedules technical maintenance and snapshot integrity checks.
- * Does NOT evaluate financial stop losses, exit signals, or trading recommendations.
+ * Recurring Technical & Strategy Schedules
  */
 export const RECURRING_SCHEDULES: ScheduledJobDef[] = [
   {
@@ -38,6 +36,17 @@ export const RECURRING_SCHEDULES: ScheduledJobDef[] = [
       date: new Date().toISOString().split('T')[0],
       verifySnapshotIntegrity: true,
       checkStaleSnapshots: true,
+    }),
+  },
+  {
+    name: 'periodic-portfolio-alert-evaluation',
+    queue: QUEUES.PORTFOLIO_ALERTS,
+    // 16:00 IST (10:30 UTC) Monday through Friday (post-market close)
+    cron: '30 10 * * 1-5',
+    description: 'Post-market portfolio holdings and active watchlist alert evaluation',
+    payload: () => ({
+      includeWatchlists: true,
+      asOfDate: new Date().toISOString(),
     }),
   },
 ];

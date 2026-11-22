@@ -4,6 +4,8 @@ export const QUEUES = {
   FILE_INGESTION: 'file-ingestion',
   SYSTEM_MAINTENANCE: 'system-maintenance',
   NIGHTLY_AUDIT: 'nightly-audit',
+  PORTFOLIO_ALERTS: 'evaluate-portfolio-alerts',
+  BATCH_RESCORE: 'batch-rescore-companies',
 } as const;
 
 export type QueueName = (typeof QUEUES)[keyof typeof QUEUES];
@@ -75,6 +77,26 @@ export const technicalDataQualityAuditPayloadSchema = z.object({
 });
 
 export type TechnicalDataQualityAuditPayload = z.infer<typeof technicalDataQualityAuditPayloadSchema>;
+
+// 4. Portfolio Alerts Evaluation Payload Schema
+export const evaluatePortfolioAlertsPayloadSchema = z.object({
+  userId: z.string().optional(),
+  asOfDate: z.string().optional(),
+  includeWatchlists: z.boolean().default(true),
+});
+
+export type EvaluatePortfolioAlertsPayload = z.infer<typeof evaluatePortfolioAlertsPayloadSchema>;
+
+// 5. Batch Rescoring Payload Schema
+export const batchRescoreCompaniesPayloadSchema = z.object({
+  userId: z.string().min(1, 'User ID is required'),
+  companyIds: z.array(z.string()).optional(),
+  ruleSetVersion: z.string().optional(),
+  stages: z.array(z.enum(['A', 'B'])).default(['A', 'B']),
+  asOfDate: z.string().optional(),
+});
+
+export type BatchRescoreCompaniesPayload = z.infer<typeof batchRescoreCompaniesPayloadSchema>;
 
 export interface JobExecutionResult {
   success: boolean;

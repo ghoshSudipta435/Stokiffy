@@ -1,6 +1,7 @@
 {
   "name": "@stock-assistant/data-providers",
   "version": "1.0.0",
+  "type": "module",
   "description": "Provider-neutral interfaces for market and financial data ingestion",
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
@@ -21,7 +22,8 @@
   },
   "dependencies": {
     "@stock-assistant/contracts": "workspace:*",
-    "@stock-assistant/core": "workspace:*"
+    "@stock-assistant/core": "workspace:*",
+    "yahoo-finance2": "^4.0.6"
   },
   "devDependencies": {
     "@types/node": "^22.0.0",

@@ -360,8 +360,9 @@ describe('ISS-03 Queue Retry Classification & pg-boss Integration', () => {
       const qm = new QueueManager(mockBoss as any);
       await qm.start();
 
-      // Total workers = sum of concurrencies in JOB_REGISTRY (2 + 3 + 1 = 6)
-      expect(mockBoss.work).toHaveBeenCalledTimes(6);
+      // Total workers = sum of concurrencies in JOB_REGISTRY
+      const expectedWorkers = Object.values(JOB_REGISTRY).reduce((sum, def) => sum + def.concurrency, 0);
+      expect(mockBoss.work).toHaveBeenCalledTimes(expectedWorkers);
       const firstCallOptions = mockBoss.work.mock.calls[0]?.[1];
       expect(firstCallOptions).toMatchObject({
         batchSize: 1,

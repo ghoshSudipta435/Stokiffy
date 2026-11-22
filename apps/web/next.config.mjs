@@ -3,6 +3,12 @@ const nextConfig = {
   reactStrictMode: true,
   poweredByHeader: false,
   compress: true,
+  transpilePackages: [
+    '@stock-assistant/core',
+    '@stock-assistant/contracts',
+    '@stock-assistant/data-providers',
+    '@stock-assistant/db',
+  ],
   
   // Strict HTTP security headers as specified in SECURITY_ARCHITECTURE.md Section 6
   async headers() {

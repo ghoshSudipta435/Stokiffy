@@ -1,12 +1,10 @@
 /**
  * Stage A — Quick Screening domain types.
- * Mirrors DOMAIN_MODEL_SPEC.md Section 4.1.
- * 
- * Policy-neutral types for Stage A input and data availability.
- * Investment screening thresholds and verdict logic are DEFERRED (pending D-A1, D-01..D-05).
+ * Mirrors DOMAIN_MODEL_SPEC.md Section 4.1 and STAGE_A_SCORING_SPEC.md.
  */
 
 import type { DataProvenance, ISODateString, Sector } from './base.js';
+import type { StageScore } from './scoring.js';
 
 /**
  * Financial metric with value and provenance.
@@ -18,46 +16,63 @@ export interface FinancialMetric {
 }
 
 /**
- * Stage A financial metrics — all nullable to preserve missing-value semantics.
- * Mirrors the raw financial statement line items needed for Stage A screening.
- * Investment calculations (ratios, CAGR, etc.) are DEFERRED pending D-A1.
+ * Historical growth or multi-year metric container.
+ */
+export interface MetricGrowthInput {
+  latestFy?: FinancialMetric | number | null;
+  priorFy?: FinancialMetric | number | null;
+  fy5yAgo?: FinancialMetric | number | null;
+  cagr5y?: FinancialMetric | number | null;
+  latestYoY?: FinancialMetric | number | null;
+}
+
+/**
+ * Stage A financial metrics — supports FinancialMetric objects,
+ * raw numeric values, and optional multi-year historical growth inputs.
  */
 export interface StageAFinancials {
   // Income statement
-  revenue: FinancialMetric;
-  netProfit: FinancialMetric;
-  operatingProfit: FinancialMetric;
+  revenue?: FinancialMetric | MetricGrowthInput | number | null;
+  netProfit?: FinancialMetric | MetricGrowthInput | number | null;
+  operatingProfit?: FinancialMetric | MetricGrowthInput | number | null;
   
   // Balance sheet
-  totalAssets: FinancialMetric;
-  totalLiabilities: FinancialMetric;
-  totalEquity: FinancialMetric;
-  totalDebt: FinancialMetric;
-  currentAssets: FinancialMetric;
-  currentLiabilities: FinancialMetric;
+  totalAssets?: FinancialMetric | number | null;
+  totalLiabilities?: FinancialMetric | number | null;
+  totalEquity?: FinancialMetric | number | null;
+  totalDebt?: FinancialMetric | number | null;
+  currentAssets?: FinancialMetric | number | null;
+  currentLiabilities?: FinancialMetric | number | null;
   
   // Derived metrics (computed from above, nullable if inputs missing)
-  interestExpense: FinancialMetric;
-  ebit: FinancialMetric;
-  eps: FinancialMetric;
-  peRatio: FinancialMetric;
-  industryPeRatio: FinancialMetric;
+  interestExpense?: FinancialMetric | number | null;
+  ebit?: FinancialMetric | number | null;
+  eps?: FinancialMetric | number | null;
+  peRatio?: FinancialMetric | number | null;
+  industryPeRatio?: FinancialMetric | number | null;
   
   // Profitability ratios
-  roa: { latestFy: FinancialMetric; avg5y: FinancialMetric };
-  industryRoaMin: FinancialMetric;
-  roe: { latestFy: FinancialMetric; avg5y: FinancialMetric };
-  roce: { latestFy: FinancialMetric; avg5y: FinancialMetric };
+  roa?: { latestFy?: FinancialMetric | number | null; avg5y?: FinancialMetric | number | null };
+  industryRoaMin?: FinancialMetric | number | null;
+  roe?: { latestFy?: FinancialMetric | number | null; avg5y?: FinancialMetric | number | null };
+  roce?: { latestFy?: FinancialMetric | number | null; avg5y?: FinancialMetric | number | null };
   
   // Margin
-  opm: { latestFy: FinancialMetric; avg5y: FinancialMetric };
-  industryOpmMin: FinancialMetric;
+  opm?: { latestFy?: FinancialMetric | number | null; avg5y?: FinancialMetric | number | null };
+  industryOpmMin?: FinancialMetric | number | null;
+
+  // Growth / historical metric extensions
+  sales?: MetricGrowthInput;
+  profit?: MetricGrowthInput;
+  salesGrowth?: MetricGrowthInput;
+  profitGrowth?: MetricGrowthInput;
+  revenueGrowth?: MetricGrowthInput;
+  netProfitGrowth?: MetricGrowthInput;
 }
 
 /**
  * Data availability report for Stage A financial metrics.
  * Tracks which metrics are present, missing, or have quality issues.
- * Does NOT make pass/fail decisions — that is policy (D-A1, D-03).
  */
 export interface StageADataAvailability {
   totalMetrics: number;
@@ -69,48 +84,66 @@ export interface StageADataAvailability {
 }
 
 /**
- * Stage A input payload — policy-neutral data container.
- * Contains raw financial metrics and provenance, no screening logic.
+ * Stage A input payload.
  */
 export interface StageAInput {
   companyId: string;
   asOfDate: ISODateString;
   financials: StageAFinancials;
   sector: Sector;
-  dataAvailability: StageADataAvailability;
+  industry?: string | undefined;
+  dataAvailability?: StageADataAvailability | undefined;
+  dataProvenance?: Record<string, DataProvenance> | undefined;
+  dataSnapshotId?: string | undefined;
 }
 
 /**
- * Stage A execution status — neutral, no investment verdict.
- * Investment verdict logic is DEFERRED pending D-A1, D-01..D-05.
+ * Stage A execution status.
  */
 export type StageAExecutionStatus = 
   | 'NOT_IMPLEMENTED'
   | 'NOT_EVALUATED'
   | 'DATA_INSUFFICIENT'
-  | 'AWAITING_POLICY';
+  | 'AWAITING_POLICY'
+  | 'COMPLETED';
 
 /**
- * Stage A output — data availability report only.
- * No score, no verdict, no pass/fail. Those require policy decisions.
+ * Verdict bands for Stage A.
  */
-export interface StageAOutput {
+export type StageAVerdictBand = 'EXCEPTIONAL' | 'EXCELLENT' | 'GOOD' | 'AVOID';
+
+/**
+ * Stage A output — unified scoring, rule breakdowns, red flags, and gate assessment.
+ */
+export interface StageAOutput extends StageScore {
   stage: 'A';
-  companyId: string;
-  asOfDate: ISODateString;
+  companyId?: string | undefined;
+  asOfDate?: ISODateString | undefined;
   sector: Sector;
-  status: StageAExecutionStatus;
-  dataAvailability: StageADataAvailability;
-  executedAt: ISODateString;
+  status?: StageAExecutionStatus | undefined;
+  dataAvailability?: StageADataAvailability | undefined;
+  executedAt?: ISODateString | undefined;
   ruleSetVersion: string;
-  message: string;
+  message?: string | undefined;
+
+  // Stage A specific evaluation outputs
+  maxPossibleScore: number;
+  minPassScore: number;
+  bankVariant: boolean;
+  verdictBand?: StageAVerdictBand | undefined;
+  gatePassed?: boolean | undefined;
+  canProceedToStageB?: boolean | undefined;
+  unsuitableRules?: string[] | undefined;
 }
 
 /**
- * Creates a default "not implemented" Stage A output.
- * Used as the neutral execution boundary until policy decisions are made.
+ * Creates a default "not implemented" Stage A output fallback.
  */
 export function createNotImplementedOutput(input: StageAInput): StageAOutput {
+  const isBank = input.sector === 'bank' || input.sector === 'nbfc';
+  const maxScore = isBank ? 9 : 10;
+  const minPass = isBank ? 5.5 : 6.5;
+
   return {
     stage: 'A',
     companyId: input.companyId,
@@ -121,5 +154,22 @@ export function createNotImplementedOutput(input: StageAInput): StageAOutput {
     executedAt: new Date().toISOString(),
     ruleSetVersion: 'stage-a-v1.0',
     message: 'Stage A execution not implemented. Investment screening thresholds and verdict logic are pending user decisions (D-A1, D-01..D-05).',
+    totalPoints: 0,
+    maxPoints: maxScore,
+    maxPossibleScore: maxScore,
+    minPassScore: minPass,
+    bankVariant: isBank,
+    ruleResults: [],
+    verdict: 'INCOMPLETE',
+    verdictBand: 'AVOID',
+    hardStops: [],
+    conditionalWarnings: [],
+    dataQualityWarnings: [],
+    valuationWarnings: [],
+    calculatedAt: new Date().toISOString(),
+    dataSnapshotId: input.dataSnapshotId ?? '',
+    gatePassed: false,
+    canProceedToStageB: false,
+    unsuitableRules: isBank ? ['currentRatio', 'interestCoverage'] : [],
   };
 }

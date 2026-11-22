@@ -31,9 +31,23 @@ export {
   validateShareholdingRow,
   validatePriceRow,
 } from './csv/validator.js';
+export {
+  OHLCVParser,
+  parseOHLCVCSV,
+  type ParsedOHLCVBar,
+  type OHLCVRowError,
+  type OHLCVParseResult,
+} from './csv/ohlcv-parser.js';
 
-// External (mock)
+// External providers
 export {
   MockFinancialStatementProvider,
   MockMarketDataProvider,
 } from './external/mock-provider.js';
+export {
+  YahooFinanceMarketDataProvider,
+  toYahooSymbol,
+  type YahooSearchResultItem,
+  type YahooQuoteResult,
+  type YahooHistoricalBarsResult,
+} from './external/yahoo-finance-provider.js';

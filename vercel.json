@@ -1,0 +1,6 @@
+{
+  "$schema": "https://openapi.vercel.sh/vercel.json",
+  "framework": "nextjs",
+  "buildCommand": "pnpm --filter @stock-assistant/db prisma:generate && pnpm --filter @stock-assistant/web build",
+  "outputDirectory": "apps/web/.next"
+}

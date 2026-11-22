@@ -15,7 +15,10 @@ import {
   BookOpen,
   Settings,
   UploadCloud,
+  List,
+  LogOut,
 } from 'lucide-react';
+import { signOut } from 'next-auth/react';
 
 interface NavItem {
   name: string;
@@ -27,6 +30,7 @@ interface NavItem {
 const PRIMARY_NAV: NavItem[] = [
   { name: 'Dashboard', href: '/dashboard', icon: LayoutDashboard },
   { name: 'Stage A: Screener', href: '/screener', icon: Filter },
+  { name: 'Watchlists', href: '/watchlists', icon: List, badge: '0' },
   { name: 'Stage E: Trade Planner', href: '/trade-planner', icon: Crosshair },
   { name: 'Stage F: Portfolio Risk', href: '/portfolio', icon: PieChart },
   { name: 'Stage G: Monitoring & Exit', href: '/monitoring', icon: Activity },
@@ -115,6 +119,23 @@ export function AppSidebar() {
                 );
               })}
             </nav>
+          </div>
+
+          {/* User Account & Sign Out */}
+          <div className="pt-2 border-t border-slate-800/80">
+            <button
+              onClick={() => signOut({ callbackUrl: '/login' })}
+              className="w-full flex items-center justify-between px-3 py-2 text-xs font-medium rounded-md text-slate-400 hover:text-rose-300 hover:bg-rose-950/20 transition-colors group"
+              title="Sign out of workstation"
+            >
+              <div className="flex items-center gap-3">
+                <LogOut className="w-4 h-4 flex-shrink-0 text-slate-500 group-hover:text-rose-400 transition-colors" />
+                <span>Lock Terminal</span>
+              </div>
+              <span className="text-[10px] font-mono text-slate-600 group-hover:text-rose-400/80">
+                Sign Out
+              </span>
+            </button>
           </div>
         </div>
       </div>

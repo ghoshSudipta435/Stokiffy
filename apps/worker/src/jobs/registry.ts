@@ -2,6 +2,8 @@ import { QUEUES, type QueueName, type JobExecutionResult, type JobExecutionConte
 import { handleProcessFileIngestion } from './handlers/process-csv-import.js';
 import { handleSystemMaintenance } from './handlers/system-maintenance.js';
 import { handleTechnicalDataQualityAudit } from './handlers/daily-data-quality-audit.js';
+import { handleEvaluatePortfolioAlerts } from './handlers/evaluate-portfolio-alerts.js';
+import { handleBatchRescoreCompanies } from './handlers/batch-rescore-companies.js';
 
 export interface JobDefinition {
   queueName: QueueName;
@@ -36,5 +38,21 @@ export const JOB_REGISTRY: Record<QueueName, JobDefinition> = {
     retryDelaySeconds: 60,
     retryBackoff: true,
     handler: handleTechnicalDataQualityAudit,
+  },
+  [QUEUES.PORTFOLIO_ALERTS]: {
+    queueName: QUEUES.PORTFOLIO_ALERTS,
+    concurrency: 1,
+    retryLimit: 2,
+    retryDelaySeconds: 30,
+    retryBackoff: true,
+    handler: handleEvaluatePortfolioAlerts,
+  },
+  [QUEUES.BATCH_RESCORE]: {
+    queueName: QUEUES.BATCH_RESCORE,
+    concurrency: 1,
+    retryLimit: 2,
+    retryDelaySeconds: 30,
+    retryBackoff: true,
+    handler: handleBatchRescoreCompanies,
   },
 };

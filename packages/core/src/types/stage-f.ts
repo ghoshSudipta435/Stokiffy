@@ -3,7 +3,8 @@
  * Mirrors DOMAIN_MODEL_SPEC.md Section 4.6.
  */
 
-import type { ISODateString } from './base.js';
+import type { DataProvenance, ISODateString, RedFlag } from './base.js';
+import type { ScoringRuleResult, StageScore } from './scoring.js';
 
 export interface Position {
   symbol: string;
@@ -80,48 +81,86 @@ export interface TradePlan {
   createdAt: ISODateString;
   updatedAt: ISODateString;
   createdBy: string;
-  executedAt?: ISODateString;
-  executedPrice?: number;
-  executedQuantity?: number;
+  executedAt?: ISODateString | undefined;
+  executedPrice?: number | undefined;
+  executedQuantity?: number | undefined;
 }
 
 export interface StageFInput {
   companyId: string;
-  tradePlanDraft: Partial<TradePlan>;
+  symbol?: string | undefined;
+  sector?: string | undefined;
+  tradePlanDraft?: Partial<TradePlan> | undefined;
   portfolio: PortfolioSnapshot;
-  riskConfig: {
-    riskPerTradePct: number;
-    maxStockExposurePct: number;
-    maxSectorExposurePct: number;
-    minRiskReward: number;
-    maxPositionPctOfADV: number;
-  };
-  valuationMaxBuyPrice: number;
-  technicalSetup: {
-    pattern: {
+  riskConfig?: {
+    riskPerTradePct?: number | undefined;
+    maxStockExposurePct?: number | undefined;
+    maxSectorExposurePct?: number | undefined;
+    minRiskReward?: number | undefined;
+    maxPositionPctOfADV?: number | undefined;
+    lotSize?: number | undefined;
+    cashBufferPct?: number | undefined;
+    estimatedFeesPct?: number | undefined;
+    slippagePct?: number | undefined;
+  } | undefined;
+  valuationMaxBuyPrice?: number | undefined;
+  technicalSetup?: {
+    id?: string | undefined;
+    pattern?: {
       name: string;
       detectedAt: ISODateString;
       timeframe: 'daily' | 'weekly';
-      candles: any[];
+      candles?: any[] | undefined;
       confirmation: boolean;
-      context: any;
-      qualityScore: number;
-    };
+      context?: any | undefined;
+      qualityScore?: number | undefined;
+    } | undefined;
     entryZone: { low: number; high: number };
-    invalidationLevel: number;
+    invalidationLevel?: number | undefined;
     stopLoss: number;
     targets: number[];
-    riskReward: number;
-    inBuyZone: boolean;
-    contextScore: number;
-  };
+    riskReward?: number | undefined;
+    inBuyZone?: boolean | undefined;
+    contextScore?: number | undefined;
+  } | undefined;
+  avgDailyVolume?: number | undefined;
+  requestedQuantity?: number | undefined;
+  overrides?: OverrideRecord[] | undefined;
+  asOfDate?: ISODateString | undefined;
+  dataSnapshotId?: string | undefined;
+  createdBy?: string | undefined;
+  dataProvenance?: DataProvenance | undefined;
 }
 
-export interface StageFOutput {
+export interface PositionSizingResult {
+  rawQuantity: number;
+  adjustedQuantity: number;
+  positionSize: number;
+  entryPriceEst: number;
+  riskBudget: number;
+  riskPerShare: number;
+  plannedPositionValue: number;
+  plannedLossAtStop: number;
+  actualRiskPct: number;
+  postTradeStockExposurePct: number;
+  postTradeSectorExposurePct: number;
+  cashRemaining: number;
+  estimatedFees: number;
+  limitingFactor: 'risk_budget' | 'lot_size' | 'liquidity' | 'cash' | 'stock_cap' | 'sector_cap' | 'requested_quantity' | 'invalid_inputs';
+}
+
+export interface StageFOutput extends StageScore {
   stage: 'F';
+  companyId?: string | undefined;
+  symbol?: string | undefined;
   tradePlan: TradePlan;
+  positionSizing: PositionSizingResult;
   riskChecks: RiskCheckResult[];
   blocked: boolean;
-  calculatedAt: ISODateString;
-  ruleSetVersion: string;
+  gatePassed: boolean;
+  canProceedToStageG: boolean;
+  canApprovePlan: boolean;
+  disclaimer: string;
+  flags: RedFlag[];
+  ruleResults: ScoringRuleResult[];
 }

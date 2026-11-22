@@ -1,8 +1,12 @@
 import { NextRequest } from 'next/server';
 import { apiHandler } from '@/lib/api-handler';
 import { createSuccessResponse, createErrorResponse } from '@/lib/api-response';
+import { requireAuth } from '@/lib/auth';
+import { prisma } from '@stock-assistant/db';
 
 export const dynamic = 'force-dynamic';
+
+type StageStatus = 'PENDING' | 'PASS' | 'FAIL';
 
 export interface CompanyDetailDTO {
   id: string;
@@ -15,13 +19,13 @@ export interface CompanyDetailDTO {
   isDemoFixture: boolean;
   engineIntegrationStatus: 'PENDING_CORE_ENGINE_INTEGRATION';
   stages: {
-    stageAStatus: 'PENDING';
-    stageBStatus: 'PENDING';
+    stageAStatus: StageStatus;
+    stageBStatus: StageStatus;
     stageCScore?: number;
-    stageDValuation?: 'PENDING';
-    stageEStatus?: 'PENDING';
-    stageFStatus?: 'PENDING';
-    stageGMonitoring?: 'PENDING';
+    stageDValuation: StageStatus;
+    stageEStatus: StageStatus;
+    stageFStatus: StageStatus;
+    stageGMonitoring: StageStatus;
   };
   redFlags: Array<{
     id: string;
@@ -33,158 +37,82 @@ export interface CompanyDetailDTO {
   lastUpdated?: string;
 }
 
-// Neutral demonstration fixture for UI component layout testing
-const DETAILS_FIXTURE: Record<string, CompanyDetailDTO> = {
-  TCS: {
-    id: 'comp_01',
-    symbol: 'TCS',
-    isin: 'INE467B01029',
-    name: 'Tata Consultancy Services Ltd. [DEMO FIXTURE]',
-    exchange: 'NSE',
-    sector: 'Information Technology',
-    industry: 'IT Services & Consulting',
-    isDemoFixture: true,
-    engineIntegrationStatus: 'PENDING_CORE_ENGINE_INTEGRATION',
-    stages: {
-      stageAStatus: 'PENDING',
-      stageBStatus: 'PENDING',
-      stageCScore: undefined,
-      stageDValuation: 'PENDING',
-      stageEStatus: 'PENDING',
-      stageFStatus: 'PENDING',
-      stageGMonitoring: 'PENDING',
-    },
-    redFlags: [],
-    lastUpdated: new Date().toISOString(),
-  },
-  INFY: {
-    id: 'comp_02',
-    symbol: 'INFY',
-    isin: 'INE009A01021',
-    name: 'Infosys Limited [DEMO FIXTURE]',
-    exchange: 'NSE',
-    sector: 'Information Technology',
-    industry: 'IT Services & Consulting',
-    isDemoFixture: true,
-    engineIntegrationStatus: 'PENDING_CORE_ENGINE_INTEGRATION',
-    stages: {
-      stageAStatus: 'PENDING',
-      stageBStatus: 'PENDING',
-      stageCScore: undefined,
-      stageDValuation: 'PENDING',
-      stageEStatus: 'PENDING',
-      stageFStatus: 'PENDING',
-      stageGMonitoring: 'PENDING',
-    },
-    redFlags: [],
-    lastUpdated: new Date().toISOString(),
-  },
-  HDFCBANK: {
-    id: 'comp_03',
-    symbol: 'HDFCBANK',
-    isin: 'INE040A01034',
-    name: 'HDFC Bank Limited [DEMO FIXTURE]',
-    exchange: 'NSE',
-    sector: 'Financial Services',
-    industry: 'Private Banks',
-    isDemoFixture: true,
-    engineIntegrationStatus: 'PENDING_CORE_ENGINE_INTEGRATION',
-    stages: {
-      stageAStatus: 'PENDING',
-      stageBStatus: 'PENDING',
-      stageCScore: undefined,
-      stageDValuation: 'PENDING',
-      stageEStatus: 'PENDING',
-      stageFStatus: 'PENDING',
-      stageGMonitoring: 'PENDING',
-    },
-    redFlags: [],
-    lastUpdated: new Date().toISOString(),
-  },
-  RELIANCE: {
-    id: 'comp_04',
-    symbol: 'RELIANCE',
-    isin: 'INE002A01018',
-    name: 'Reliance Industries Limited [DEMO FIXTURE]',
-    exchange: 'NSE',
-    sector: 'Energy',
-    industry: 'Oil & Gas Refining & Marketing',
-    isDemoFixture: true,
-    engineIntegrationStatus: 'PENDING_CORE_ENGINE_INTEGRATION',
-    stages: {
-      stageAStatus: 'PENDING',
-      stageBStatus: 'PENDING',
-      stageCScore: undefined,
-      stageDValuation: 'PENDING',
-      stageEStatus: 'PENDING',
-      stageFStatus: 'PENDING',
-      stageGMonitoring: 'PENDING',
-    },
-    redFlags: [
-      {
-        id: 'flag_01',
-        code: 'DEBT_SPIKE',
-        title: 'Subsidiary Debt Spike',
-        severity: 'WARNING',
-        status: 'ACTIVE',
-      },
-    ],
-    lastUpdated: new Date().toISOString(),
-  },
-  TITAN: {
-    id: 'comp_05',
-    symbol: 'TITAN',
-    isin: 'INE280A01028',
-    name: 'Titan Company Limited [DEMO FIXTURE]',
-    exchange: 'NSE',
-    sector: 'Consumer Discretionary',
-    industry: 'Gems, Jewellery & Watches',
-    isDemoFixture: true,
-    engineIntegrationStatus: 'PENDING_CORE_ENGINE_INTEGRATION',
-    stages: {
-      stageAStatus: 'PENDING',
-      stageBStatus: 'PENDING',
-      stageCScore: undefined,
-      stageDValuation: 'PENDING',
-      stageEStatus: 'PENDING',
-      stageFStatus: 'PENDING',
-      stageGMonitoring: 'PENDING',
-    },
-    redFlags: [],
-    lastUpdated: new Date().toISOString(),
-  },
+const stageStatusOf = (verdict: string | null | undefined): StageStatus => {
+  if (verdict === 'PASS' || verdict === 'FAIL') return verdict;
+  return 'PENDING';
 };
 
 export const GET = apiHandler(async (_req: NextRequest, { requestId, params }) => {
-  const idOrSymbol = String(params.id || '').toUpperCase();
+  const session = await requireAuth(_req);
+  const userId = session.user.id;
 
-  const foundCompany =
-    DETAILS_FIXTURE[idOrSymbol] ||
-    Object.values(DETAILS_FIXTURE).find(
-      (c) => c.id.toLowerCase() === idOrSymbol.toLowerCase() || c.symbol === idOrSymbol
+  const idOrSymbol = String(params.id || '');
+
+  let company = await prisma.company.findFirst({
+    where: { userId, id: idOrSymbol },
+  });
+  if (!company) {
+    company = await prisma.company.findFirst({
+      where: { userId, symbol: { equals: idOrSymbol, mode: 'insensitive' } },
+    });
+  }
+
+  if (!company) {
+    return createErrorResponse(
+      'RESOURCE_NOT_FOUND',
+      `Company with id or symbol '${idOrSymbol}' not found`,
+      404,
+      requestId
     );
+  }
 
-  const company = foundCompany || {
-    id: `comp_${idOrSymbol.toLowerCase().replace(/[^a-z0-9]/g, '_')}`,
-    symbol: idOrSymbol,
-    isin: 'INE000000000',
-    name: `${idOrSymbol} Limited [DEMO FIXTURE]`,
-    exchange: 'NSE' as const,
-    sector: 'Diversified',
-    industry: 'General Equities',
-    isDemoFixture: true,
-    engineIntegrationStatus: 'PENDING_CORE_ENGINE_INTEGRATION' as const,
+  const [latestFinancials, analysisRuns, activeFlags] = await Promise.all([
+    prisma.financialStatement.findFirst({
+      where: { companyId: company.id },
+      orderBy: { fiscalYear: 'desc' },
+    }),
+    prisma.analysisRun.findMany({
+      where: { companyId: company.id, userId },
+      orderBy: { calculatedAt: 'desc' },
+      take: 5,
+      include: { stageA: true, redFlags: true },
+    }),
+    prisma.redFlag.findMany({
+      where: { companyId: company.id, status: 'ACTIVE' },
+      orderBy: { createdAt: 'desc' },
+    }),
+  ]);
+
+  const stageARun = analysisRuns.find((run) => run.stage === 'A');
+  const stageBRun = analysisRuns.find((run) => run.stage === 'B');
+
+  const companyDetail: CompanyDetailDTO = {
+    id: company.id,
+    symbol: company.symbol,
+    isin: company.isin ?? '',
+    name: company.name,
+    exchange: company.exchange as 'NSE' | 'BSE',
+    sector: company.sector,
+    industry: company.sector,
+    isDemoFixture: false,
+    engineIntegrationStatus: 'PENDING_CORE_ENGINE_INTEGRATION',
     stages: {
-      stageAStatus: 'PENDING' as const,
-      stageBStatus: 'PENDING' as const,
-      stageDValuation: 'PENDING' as const,
-      stageEStatus: 'PENDING' as const,
-      stageFStatus: 'PENDING' as const,
-      stageGMonitoring: 'PENDING' as const,
+      stageAStatus: stageStatusOf(stageARun?.verdict ?? null),
+      stageBStatus: stageStatusOf(stageBRun?.verdict ?? null),
+      stageDValuation: 'PENDING',
+      stageEStatus: 'PENDING',
+      stageFStatus: 'PENDING',
+      stageGMonitoring: 'PENDING',
     },
-    redFlags: [],
-    lastUpdated: new Date().toISOString(),
+    redFlags: activeFlags.map((flag) => ({
+      id: flag.id,
+      code: flag.flagKey,
+      title: flag.message,
+      severity: flag.severity as 'HARD' | 'WARNING',
+      status: flag.status as 'ACTIVE' | 'ACKNOWLEDGED' | 'RESOLVED',
+    })),
+    lastUpdated: company.updatedAt.toISOString(),
   };
 
-  return createSuccessResponse(company, requestId);
+  return createSuccessResponse(companyDetail, requestId);
 });

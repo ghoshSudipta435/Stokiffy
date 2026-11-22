@@ -34,6 +34,7 @@ model User {
   auditEvents      AuditEvent[]
   alerts           Alert[] @relation("UserAlerts")
   ingestionJobs    IngestionJob[]
+  watchlists       Watchlist[]
 }
 
 model Company {
@@ -59,6 +60,7 @@ model Company {
   alerts           Alert[] @relation("CompanyAlerts")
   transactions     Transaction[]
   dataSnapshots    DataSnapshot[]
+  watchlistItems   WatchlistItem[]
 
   @@index([userId])
   @@index([symbol])
@@ -514,6 +516,7 @@ model JournalEntry {
   corporateActions Json?
   reviewedAt    DateTime?
   reviewedBy    String?
+  review        Json?
   createdAt     DateTime @default(now())
 
   tradePlan TradePlan @relation(fields: [tradePlanId], references: [id], onDelete: Cascade)
@@ -638,3 +641,75 @@ model IngestionJob {
   @@index([objectDeleted])
   @@index([userId, sha256Hash])
 }
+
+// ============================================================
+// Watchlists & Comparison
+// ============================================================
+
+model Watchlist {
+  id          String   @id @default(cuid())
+  userId      String
+  name        String
+  description String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  user  User            @relation(fields: [userId], references: [id], onDelete: Cascade)
+  items WatchlistItem[]
+
+  @@unique([userId, name])
+  @@index([userId])
+}
+
+model WatchlistItem {
+  id          String   @id @default(cuid())
+  watchlistId String
+  companyId   String
+  notes       String?
+  addedAt     DateTime @default(now())
+
+  watchlist Watchlist @relation(fields: [watchlistId], references: [id], onDelete: Cascade)
+  company   Company   @relation(fields: [companyId], references: [id], onDelete: Cascade)
+
+  @@unique([watchlistId, companyId])
+  @@index([watchlistId])
+  @@index([companyId])
+}
+
+// ============================================================
+// Rule Sets & Benchmarks (Configurable Strategy Parameters)
+// ============================================================
+
+model RuleSet {
+  id          String   @id @default(cuid())
+  version     String   @unique
+  name        String
+  status      String   @default("DRAFT") // DRAFT | PUBLISHED | ARCHIVED
+  configJson  Json
+  publishedAt DateTime?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  benchmarks IndustryBenchmark[]
+
+  @@index([status])
+  @@index([version])
+}
+
+model IndustryBenchmark {
+  id         String   @id @default(cuid())
+  ruleSetId  String
+  industry   String
+  opmMinPct  Decimal?
+  opmMaxPct  Decimal?
+  typicalPE  Decimal?
+  minRoaPct  Decimal?
+  sourceNote String?
+
+  ruleSet RuleSet @relation(fields: [ruleSetId], references: [id], onDelete: Cascade)
+
+  @@unique([ruleSetId, industry])
+  @@index([ruleSetId])
+  @@index([industry])
+}
+

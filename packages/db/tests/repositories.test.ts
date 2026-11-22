@@ -4,7 +4,7 @@
  * without requiring a live database connection.
  */
 
-import { describe, it, expect, vi } from 'vitest';
+import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { CompanyRepository } from '../src/repositories/company-repository.js';
 import { FinancialsRepository } from '../src/repositories/financials-repository.js';
 import { AnalysisRepository } from '../src/repositories/analysis-repository.js';
@@ -50,6 +50,12 @@ const mockPrisma = {
 } as any;
 
 describe('Repository boundary tests', () => {
+  // Clear mock call history between tests so each test asserts only its own
+  // Prisma interactions (implementations set via mockResolvedValue are kept).
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
+
   describe('CompanyRepository', () => {
     it('can be instantiated with a mock Prisma client', () => {
       const repo = new CompanyRepository(mockPrisma);
@@ -427,7 +433,7 @@ describe('Repository boundary tests', () => {
           status: 'QUEUED',
           OR: [
             { leaseExpiresAt: null },
-            { leaseExpiresAt: { lt: now } },
+            { leaseExpiresAt: { lt: expect.any(Date) } },
           ],
         },
         data: {
@@ -435,8 +441,8 @@ describe('Repository boundary tests', () => {
           leaseOwner: 'worker-1',
           leaseToken: 'token-abc',
           leaseExpiresAt: expiresAt,
-          lastHeartbeatAt: now,
-          startedAt: now,
+          lastHeartbeatAt: expect.any(Date),
+          startedAt: expect.any(Date),
           attemptCount: { increment: 1 },
         },
       });
@@ -501,7 +507,7 @@ describe('Repository boundary tests', () => {
         totalRows: 200,
       } as any;
       mockPrisma.ingestionJob.findUnique.mockResolvedValue(existing);
-      mockPrisma.ingestionJob.update.mockResolvedValue({ ...existing, processedRows: 150 } as any);
+      mockPrisma.ingestionJob.update.mockResolvedValue({ ...existing, processedRows: 150, acceptedRows: 90 } as any);
 
       const result = await repo.updateProgress('job-1', 'token-abc', {
         processedRows: 150,

@@ -1,16 +1,59 @@
 import { NextResponse, type NextRequest } from 'next/server';
+import { getToken } from 'next-auth/jwt';
 
-export function middleware(request: Request) {
-  const req = request as unknown as {
-    headers: Headers;
-    url: string;
-    nextUrl: URL;
-  };
+const PROTECTED_PREFIXES = [
+  '/dashboard',
+  '/screener',
+  '/companies',
+  '/watchlists',
+  '/trade-planner',
+  '/portfolio',
+  '/monitoring',
+  '/journal',
+  '/settings',
+];
 
-  const requestId = req.headers.get('x-request-id') || crypto.randomUUID();
-  
+const DEFAULT_SECRET = 'stokiffy-default-dev-secret-do-not-use-in-production-1234';
+
+export async function middleware(request: NextRequest) {
+  const requestId = request.headers.get('x-request-id') || crypto.randomUUID();
+  const pathname = request.nextUrl.pathname;
+
+  const isDevAuth =
+    process.env.ALLOW_PERSONAL_DEV_AUTH === 'true' ||
+    (process.env.ALLOW_PERSONAL_DEV_AUTH !== 'false' && process.env.PERSONAL_MODE === 'true');
+
+  const isProtectedRoute = PROTECTED_PREFIXES.some(
+    (prefix) => pathname === prefix || pathname.startsWith(`${prefix}/`)
+  );
+
+  // If route is protected and personal dev auth is disabled, verify session token
+  if (isProtectedRoute && !isDevAuth) {
+    const token = await getToken({
+      req: request,
+      secret: process.env.NEXTAUTH_SECRET || DEFAULT_SECRET,
+    });
+
+    if (!token) {
+      const loginUrl = new URL('/login', request.url);
+      loginUrl.searchParams.set('callbackUrl', request.nextUrl.pathname + request.nextUrl.search);
+      return NextResponse.redirect(loginUrl);
+    }
+  }
+
+  // If already logged in and visiting /login in production, redirect to /dashboard
+  if (pathname === '/login' && !isDevAuth) {
+    const token = await getToken({
+      req: request,
+      secret: process.env.NEXTAUTH_SECRET || DEFAULT_SECRET,
+    });
+    if (token) {
+      return NextResponse.redirect(new URL('/dashboard', request.url));
+    }
+  }
+
   // Clone request headers and inject request-id
-  const requestHeaders = new Headers(req.headers);
+  const requestHeaders = new Headers(request.headers);
   requestHeaders.set('x-request-id', requestId);
 
   const response = NextResponse.next({
@@ -39,7 +82,7 @@ export function middleware(request: Request) {
 export const config = {
   matcher: [
     /*
-     * Match all request paths except for the ones starting with:
+     * Match all request paths except for:
      * - _next/static (static files)
      * - _next/image (image optimization files)
      * - favicon.ico (favicon file)

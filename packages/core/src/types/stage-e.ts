@@ -1,9 +1,10 @@
 /**
  * Stage E — Technical Analysis domain types.
- * Mirrors DOMAIN_MODEL_SPEC.md Section 4.5.
+ * Mirrors DOMAIN_MODEL_SPEC.md Section 4.5 and TECHNICAL_ANALYSIS_SPEC.md.
  */
 
 import type { DataProvenance, ISODateString, RedFlag } from './base.js';
+import type { ScoringRuleResult, StageScore } from './scoring.js';
 
 export type PatternName =
   | 'bullish-engulfing'
@@ -32,21 +33,22 @@ export interface CandlestickPattern {
   timeframe: 'daily' | 'weekly';
   candles: OhlcvBar[];
   confirmation: boolean;
-  confirmationCandle?: OhlcvBar;
+  confirmationCandle?: OhlcvBar | undefined;
   context: PatternContext;
   qualityScore: number;
+  explanation?: string | undefined;
 }
 
 export interface PatternContext {
   trend: 'uptrend' | 'downtrend' | 'sideways';
   trendDuration: number;
-  supportLevel?: number;
-  resistanceLevel?: number;
-  distanceToSupportPct?: number;
-  distanceToResistancePct?: number;
+  supportLevel?: number | undefined;
+  resistanceLevel?: number | undefined;
+  distanceToSupportPct?: number | undefined;
+  distanceToResistancePct?: number | undefined;
   volumeSpike: boolean;
   volumeTrend: 'increasing' | 'decreasing' | 'flat';
-  nearMovingAverage?: '20' | '50' | '200';
+  nearMovingAverage?: '20' | '50' | '200' | undefined;
   maTrend: 'rising' | 'falling' | 'flat';
   atr: number;
   gapRisk: 'low' | 'medium' | 'high';
@@ -61,22 +63,33 @@ export interface TechnicalSetup {
   riskReward: number;
   inBuyZone: boolean;
   contextScore: number;
+  setupQuality: 'A+' | 'A' | 'B' | 'C';
 }
 
 export interface StageEInput {
   companyId: string;
   asOfDate: ISODateString;
   adjustedOhlcvDaily: OhlcvBar[];
-  adjustedOhlcvWeekly: OhlcvBar[];
-  valuationMaxBuyPrice: number;
-  dataProvenance: DataProvenance;
+  adjustedOhlcvWeekly?: OhlcvBar[] | undefined;
+  valuationMaxBuyPrice?: number | undefined;
+  selectedFairValue?: number | undefined;
+  dataProvenance?: DataProvenance | undefined;
+  dataSnapshotId?: string | undefined;
+  minRiskReward?: number | undefined;
+  buyZoneTolerancePct?: number | undefined;
 }
 
-export interface StageEOutput {
+export interface StageEOutput extends StageScore {
   stage: 'E';
+  companyId?: string | undefined;
+  asOfDate?: ISODateString | undefined;
+  executedAt?: ISODateString | undefined;
+  message?: string | undefined;
   setups: TechnicalSetup[];
   eligible: boolean;
-  bestSetup?: TechnicalSetup;
+  gatePassed: boolean;
+  canProceedToStageF: boolean;
+  bestSetup?: TechnicalSetup | undefined;
   priceData: {
     currentPrice: number;
     maxBuyPrice: number;
@@ -89,8 +102,12 @@ export interface StageEOutput {
     keyLevels: { support: number[]; resistance: number[] };
     volumeProfile: 'bullish' | 'bearish' | 'neutral';
     rsVsBenchmark: 'outperforming' | 'underperforming' | 'inline';
+    sma20?: number | undefined;
+    sma50?: number | undefined;
+    sma200?: number | undefined;
+    atr14: number;
+    volumeRatio: number;
   };
   flags: RedFlag[];
-  calculatedAt: ISODateString;
-  ruleSetVersion: string;
+  ruleResults: ScoringRuleResult[];
 }

@@ -1,6 +1,6 @@
 /**
  * Stage B — Deep Trend Analysis domain types.
- * Mirrors DOMAIN_MODEL_SPEC.md Section 4.2.
+ * Mirrors DOMAIN_MODEL_SPEC.md Section 4.2 and STAGE_B_SCORING_SPEC.md.
  */
 
 import type { DataProvenance, ISODateString } from './base.js';
@@ -8,34 +8,34 @@ import type { ScoringRuleResult, StageScore } from './scoring.js';
 
 export interface QuarterlyPoint {
   period: string;
-  salesYoY: number;
-  opmYoY: number;
-  dataQuality: DataProvenance;
+  salesYoY: number | null;
+  opmYoY: number | null;
+  dataQuality?: DataProvenance | undefined;
 }
 
 export interface AnnualPoint {
   period: string;
-  sales: number;
-  opm: number;
-  netProfit: number;
-  netMargin: number;
-  reserves: number;
-  borrowings: number;
-  cfo: number;
-  pat: number;
-  debtorDays: number;
-  roce: number;
-  dataQuality: DataProvenance;
+  sales: number | null;
+  opm: number | null;
+  netProfit: number | null;
+  netMargin?: number | null | undefined;
+  reserves?: number | null | undefined;
+  borrowings?: number | null | undefined;
+  cfo?: number | null | undefined;
+  pat?: number | null | undefined;
+  debtorDays?: number | null | undefined;
+  roce?: number | null | undefined;
+  dataQuality?: DataProvenance | undefined;
 }
 
 export interface ShareholdingPoint {
   period: string;
-  promoterPct: number;
-  fiiPct: number;
-  diiPct: number;
-  publicPct: number;
-  promoterPledgePct?: number;
-  dataQuality: DataProvenance;
+  promoterPct: number | null;
+  fiiPct: number | null;
+  diiPct: number | null;
+  publicPct: number | null;
+  promoterPledgePct?: number | null | undefined;
+  dataQuality?: DataProvenance | undefined;
 }
 
 export type TrendClassification =
@@ -58,21 +58,33 @@ export interface StageBInput {
   quarterly: QuarterlyPoint[];
   annual: AnnualPoint[];
   shareholding: ShareholdingPoint[];
-  dataProvenance: DataProvenance;
+  dataProvenance?: DataProvenance | undefined;
+  dataSnapshotId?: string | undefined;
 }
 
 export interface StageBRuleResult extends ScoringRuleResult {
-  trendClassification?: TrendClassification;
+  trendClassification?: TrendClassification | undefined;
   supportingData?: {
     periodCount: number;
     positivePeriods: number;
     negativePeriods: number;
     flatPeriods: number;
-  };
+  } | undefined;
 }
+
+export type StageBVerdictBand = 'EXCEPTIONAL' | 'EXCELLENT' | 'GOOD' | 'AVOID';
 
 export interface StageBOutput extends StageScore {
   stage: 'B';
+  companyId?: string | undefined;
+  asOfDate?: ISODateString | undefined;
+  executedAt?: ISODateString | undefined;
+  message?: string | undefined;
+  maxPossibleScore?: number | undefined;
+  minPassScore?: number | undefined;
+  gatePassed?: boolean | undefined;
+  canProceedToStageC?: boolean | undefined;
+  verdictBand?: StageBVerdictBand | undefined;
   ruleResults: StageBRuleResult[];
   quarterlyAnalysis: {
     salesTrend: TrendClassification;
