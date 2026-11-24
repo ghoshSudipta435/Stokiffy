@@ -1,5 +1,59 @@
+import fs from 'node:fs';
+import path from 'node:path';
 import { z } from 'zod';
 import { resolveSharedStorageDir } from './storage/path-resolver';
+
+function loadEnvFile(envPath: string): void {
+  if (!fs.existsSync(envPath)) return;
+  try {
+    const content = fs.readFileSync(envPath, 'utf8');
+    for (const rawLine of content.split('\n')) {
+      const line = rawLine.trim();
+      if (!line || line.startsWith('#')) continue;
+      const eqIdx = line.indexOf('=');
+      if (eqIdx === -1) continue;
+      const key = line.slice(0, eqIdx).trim();
+      let val = line.slice(eqIdx + 1).trim();
+      if ((val.startsWith('"') && val.endsWith('"')) || (val.startsWith("'") && val.endsWith("'"))) {
+        val = val.slice(1, -1);
+      }
+      if (process.env[key] === undefined) {
+        process.env[key] = val;
+      }
+    }
+  } catch {
+    // Ignore read errors
+  }
+}
+
+/**
+ * Initializes environment variables for local development by searching
+ * for the monorepo root `.env` / `.env.local` files if not already present.
+ */
+export function initEnv(): void {
+  // If DATABASE_URL is already defined in environment (e.g. in CI or on Vercel), do nothing
+  if (process.env.DATABASE_URL && process.env.ALLOW_PERSONAL_DEV_AUTH !== undefined) {
+    return;
+  }
+
+  const candidates = [
+    process.cwd(),
+    path.resolve(process.cwd(), '..'),
+    path.resolve(process.cwd(), '../..'),
+  ];
+
+  for (const dir of candidates) {
+    const envPath = path.join(dir, '.env');
+    if (fs.existsSync(envPath)) {
+      loadEnvFile(path.join(dir, '.env.local'));
+      loadEnvFile(envPath);
+      break;
+    }
+  }
+}
+
+// Run immediately on module import
+initEnv();
 
 const envSchema = z.object({
   NODE_ENV: z.enum(['development', 'test', 'production']).default('development'),
@@ -19,6 +73,7 @@ const envSchema = z.object({
 
   // Personal mode single-user enforcement flag
   PERSONAL_MODE: z.string().transform((v: string) => v === 'true').default('true'),
+  ALLOW_PERSONAL_DEV_AUTH: z.string().default('true'),
 
   // Shared local staging & job status directories (optional explicit overrides)
   JOBS_DIR: z.string().optional(),

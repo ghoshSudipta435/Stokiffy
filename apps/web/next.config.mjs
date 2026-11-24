@@ -1,3 +1,39 @@
+import fs from 'node:fs';
+import path from 'node:path';
+import { fileURLToPath } from 'node:url';
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
+
+// Helper to load env file from monorepo root for local development
+function loadEnvFile(envPath) {
+  if (!fs.existsSync(envPath)) return;
+  try {
+    const content = fs.readFileSync(envPath, 'utf8');
+    for (const rawLine of content.split('\n')) {
+      const line = rawLine.trim();
+      if (!line || line.startsWith('#')) continue;
+      const eqIdx = line.indexOf('=');
+      if (eqIdx === -1) continue;
+      const key = line.slice(0, eqIdx).trim();
+      let val = line.slice(eqIdx + 1).trim();
+      if ((val.startsWith('"') && val.endsWith('"')) || (val.startsWith("'") && val.endsWith("'"))) {
+        val = val.slice(1, -1);
+      }
+      if (process.env[key] === undefined) {
+        process.env[key] = val;
+      }
+    }
+  } catch {
+    // Ignore read errors
+  }
+}
+
+// Automatically load monorepo root environment files for local dev
+const rootDir = path.resolve(__dirname, '../..');
+loadEnvFile(path.join(rootDir, '.env.local'));
+loadEnvFile(path.join(rootDir, '.env'));
+
 /** @type {import('next').NextConfig} */
 const nextConfig = {
   reactStrictMode: true,

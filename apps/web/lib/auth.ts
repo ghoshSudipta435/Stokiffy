@@ -1,3 +1,4 @@
+import './env';
 import { NextRequest } from 'next/server';
 import type { NextAuthOptions, Session, User } from 'next-auth';
 import { getServerSession } from 'next-auth';
@@ -120,7 +121,8 @@ export const authOptions: NextAuthOptions = {
 export async function getSession(req?: NextRequest): Promise<UserSession | null> {
   const allowDevAuth =
     process.env.ALLOW_PERSONAL_DEV_AUTH === 'true' ||
-    (process.env.ALLOW_PERSONAL_DEV_AUTH !== 'false' && process.env.PERSONAL_MODE === 'true');
+    (process.env.ALLOW_PERSONAL_DEV_AUTH !== 'false' && process.env.PERSONAL_MODE === 'true') ||
+    (process.env.NODE_ENV === 'development' && process.env.ALLOW_PERSONAL_DEV_AUTH !== 'false');
 
   if (allowDevAuth) {
     return {

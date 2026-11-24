@@ -1,3 +1,4 @@
+import './env';
 import { NextRequest, NextResponse } from 'next/server';
 import { ZodError } from 'zod';
 import { logger } from './logger';
