@@ -1,7 +1,8 @@
 'use client';
 
-import React, { useState, useCallback } from 'react';
+import React, { Suspense, useState, useCallback, useEffect } from 'react';
 import Link from 'next/link';
+import { useSearchParams } from 'next/navigation';
 import {
   Crosshair,
   Info,
@@ -28,7 +29,15 @@ const RISK_CHECK_LABELS: Record<string, string> = {
   stop_below_entry: 'Stop Below Entry',
 };
 
-export default function TradePlannerPage() {
+const TradePlannerContent = () => {
+  const searchParams = useSearchParams();
+
+  // Pre-fill from URL query params when navigated from Company Research (Stage E)
+  const queryCompanyId = searchParams.get('companyId') ?? '';
+  const queryEntry = searchParams.get('entry') ?? '';
+  const queryStop = searchParams.get('stop') ?? '';
+  const queryTarget = searchParams.get('target') ?? '';
+
   const {
     tradePlans,
     isLoadingTradePlans,
@@ -37,14 +46,14 @@ export default function TradePlannerPage() {
   } = useTradePlans();
   const { data: screenerData, isLoading: screenerLoading } = useScreener({ limit: 100 });
 
-  const companies = screenerData?.data ?? [];
+  const companies = React.useMemo(() => screenerData?.data ?? [], [screenerData?.data]);
 
   // Form state
-  const [companyId, setCompanyId] = useState('');
+  const [companyId, setCompanyId] = useState(queryCompanyId);
   const [symbol, setSymbol] = useState('');
-  const [entryPrice, setEntryPrice] = useState('');
-  const [stopPrice, setStopPrice] = useState('');
-  const [targetPrice, setTargetPrice] = useState('');
+  const [entryPrice, setEntryPrice] = useState(queryEntry);
+  const [stopPrice, setStopPrice] = useState(queryStop);
+  const [targetPrice, setTargetPrice] = useState(queryTarget);
   const [thesis, setThesis] = useState('');
   const [invalidationCondition, setInvalidationCondition] = useState('');
   const [entryRationale, setEntryRationale] = useState('');
@@ -53,6 +62,14 @@ export default function TradePlannerPage() {
 
   const [lastResult, setLastResult] = useState<any>(null);
   const [submitError, setSubmitError] = useState<string | null>(null);
+
+  // Resolve symbol from selected company
+  useEffect(() => {
+    if (companyId) {
+      const c = companies.find((x) => x.id === companyId);
+      if (c) setSymbol(c.symbol);
+    }
+  }, [companyId, companies]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -100,8 +117,6 @@ export default function TradePlannerPage() {
       return;
     }
     try {
-      // Apply override via update trade plan
-      // Note: overrides are recorded in the plan; re-fetch to refresh
       setSubmitError(null);
     } catch (err: any) {
       setSubmitError(err?.message || 'Override failed.');
@@ -440,5 +455,17 @@ export default function TradePlannerPage() {
         </div>
       </div>
     </div>
+  );
+};
+
+export default function TradePlannerPage() {
+  return (
+    <Suspense fallback={
+      <div className="p-12 text-center text-slate-400 font-mono">
+        Loading trade planner…
+      </div>
+    }>
+      <TradePlannerContent />
+    </Suspense>
   );
 }

@@ -15,6 +15,8 @@ type StatementRow = EditableFinancialStatement & {
   id: string;
   period: string;
   source: string;
+  operatingCashFlow: number | null;
+  debtorDays: number | null;
 };
 
 function mapToRow(s: any): StatementRow {
@@ -43,12 +45,19 @@ function mapToRow(s: any): StatementRow {
     operatingProfit: getNum(s.operatingProfit),
     netProfit: getNum(s.netProfit),
     eps: getNum(s.eps),
+    ebit: getNum(s.ebit),
+    interestExpense: getNum(s.interestExpense),
+    totalAssets: getNum(s.totalAssets),
+    totalLiabilities: getNum(s.totalLiabilities),
     totalEquity: getNum(s.totalEquity),
     totalDebt: getNum(s.totalDebt),
+    currentAssets: getNum(s.currentAssets),
+    currentLiabilities: getNum(s.currentLiabilities),
     operatingCashFlow: getNum(s.fcf),
     fcf: getNum(s.fcf),
     debtorDays: null,
     source: s.sourceDocumentRef ?? 'MANUAL_ENTRY',
+    sourceDocumentRef: s.sourceDocumentRef ?? 'MANUAL_ENTRY',
   };
 }
 
@@ -226,20 +235,23 @@ export function FinancialsTablePanel({ companyId }: FinancialsTablePanelProps) {
           initialStatement={
             editStatement
               ? {
-                  id: editStatement.id,
-                  companyId,
                   periodType: editStatement.periodType === 'Annual' ? 'Annual' : 'Quarterly',
                   fiscalYear: editStatement.fiscalYear,
                   fiscalQuarter: editStatement.fiscalQuarter,
-                  revenue: editStatement.revenue != null ? { value: editStatement.revenue, provenance: {} as any } : { value: null, provenance: {} as any },
-                  netProfit: editStatement.netProfit != null ? { value: editStatement.netProfit, provenance: {} as any } : { value: null, provenance: {} as any },
-                  operatingProfit: editStatement.operatingProfit != null ? { value: editStatement.operatingProfit, provenance: {} as any } : { value: null, provenance: {} as any },
-                  eps: editStatement.eps != null ? { value: editStatement.eps, provenance: {} as any } : { value: null, provenance: {} as any },
-                  totalEquity: editStatement.totalEquity != null ? { value: editStatement.totalEquity, provenance: {} as any } : { value: null, provenance: {} as any },
-                  totalDebt: editStatement.totalDebt != null ? { value: editStatement.totalDebt, provenance: {} as any } : { value: null, provenance: {} as any },
-                  fcf: editStatement.fcf != null ? { value: editStatement.fcf, provenance: {} as any } : { value: null, provenance: {} as any },
+                  revenue: editStatement.revenue,
+                  operatingProfit: editStatement.operatingProfit,
+                  netProfit: editStatement.netProfit,
+                  eps: editStatement.eps,
+                  ebit: editStatement.ebit,
+                  interestExpense: editStatement.interestExpense,
+                  totalAssets: editStatement.totalAssets,
+                  totalLiabilities: editStatement.totalLiabilities,
+                  totalEquity: editStatement.totalEquity,
+                  totalDebt: editStatement.totalDebt,
+                  currentAssets: editStatement.currentAssets,
+                  currentLiabilities: editStatement.currentLiabilities,
+                  fcf: editStatement.fcf,
                   sourceDocumentRef: editStatement.source,
-                  createdAt: new Date().toISOString(),
                 }
               : null
           }

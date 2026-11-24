@@ -1,6 +1,8 @@
 'use client';
 
 import React, { useState } from 'react';
+import Link from 'next/link';
+import { useRouter } from 'next/navigation';
 import {
   Play,
   Loader2,
@@ -13,6 +15,7 @@ import {
   FileText,
   Upload,
   RefreshCw,
+  ArrowRight,
 } from 'lucide-react';
 import { apiClient } from '@/lib/api-client';
 import type { StageERunResponse } from '@/app/api/v1/analyses/stage-e/route';
@@ -77,6 +80,7 @@ export function StageEPanel({
     latestDate: string | null;
     yahooSymbol: string;
   } | null>(null);
+  const router = useRouter();
 
   const { data: priceBars, isLoading: priceBarsLoading } = usePriceBars(companyId);
   const syncOhlcv = useSyncOhlcv();
@@ -321,6 +325,24 @@ export function StageEPanel({
               )}
               Sync Prices (Yahoo)
             </button>
+            {runResult && (
+              <Link
+                href={{
+                  pathname: '/trade-planner',
+                  query: {
+                    companyId,
+                    entry: runResult.currentPrice?.toString() ?? '',
+                    stop: runResult.bestSetup?.invalidationLevel?.toString() ?? '',
+                    target: runResult.bestSetup?.targets?.[0]?.toString() ?? '',
+                  },
+                }}
+                className="inline-flex items-center gap-2 px-3 py-1.5 rounded bg-cyan-500 hover:bg-cyan-400 text-slate-950 font-semibold text-xs transition-colors"
+              >
+                <Play className="w-3.5 h-3.5 mr-1.5" />
+                Create Trade Plan (Stage F)
+                <ArrowRight className="w-3 h-3.5 ml-1" />
+              </Link>
+            )}
             <span className="text-xs text-slate-500">
               Last run: {runResult.analysisRunId && 'now'}
             </span>

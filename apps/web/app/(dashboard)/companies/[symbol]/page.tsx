@@ -9,6 +9,7 @@ import {
   Loader2,
   AlertTriangle,
   FileText,
+  Download,
 } from 'lucide-react';
 import { useCompany } from '@/hooks/use-company';
 import { useFlags } from '@/hooks/use-flags';
@@ -20,8 +21,10 @@ import { StageBPanel } from '@/components/company/stage-b-panel';
 import { StageCPanel } from '@/components/company/stage-c-panel';
 import { StageDPanel } from '@/components/company/stage-d-panel';
 import { StageEPanel } from '@/components/company/stage-e-panel';
+import { FinancialsTablePanel } from '@/components/company/financials-table-panel';
 import { AddFinancialsModal } from '@/components/company/add-financials-modal';
 import { FlagOverrideModal } from '@/components/company/flag-override-modal';
+import { exportMemo } from '@/components/company/export-memo';
 import type { CompanyDetailDTO } from '@/app/api/v1/companies/[id]/route';
 import type { RedFlagDTO } from '@/app/api/v1/flags/route';
 import { apiClient } from '@/lib/api-client';
@@ -31,7 +34,7 @@ import type { StageCRunResponse } from '@/app/api/v1/companies/[id]/moat-assessm
 import type { StageDRunResponse } from '@/app/api/v1/companies/[id]/valuations/route';
 import type { StageERunResponse } from '@/app/api/v1/analyses/stage-e/route';
 
-type Tab = 'A' | 'B' | 'C' | 'D' | 'E';
+type Tab = 'A' | 'B' | 'C' | 'D' | 'E' | 'F';
 
 const TAB_LABELS: Record<Tab, string> = {
   A: 'Stage A — Quick Screening',
@@ -39,6 +42,7 @@ const TAB_LABELS: Record<Tab, string> = {
   C: 'Stage C — Business Model & Moat',
   D: 'Stage D — Valuation',
   E: 'Stage E — Technical Entry',
+  F: 'Financials',
 };
 
 export default function CompanyDetailPage() {
@@ -248,6 +252,23 @@ export default function CompanyDetailPage() {
             <FileText className="w-3 h-3.5 mr-1.5" />
             Add Financials
           </button>
+          <button
+            onClick={() =>
+              exportMemo({
+                company,
+                stageARun,
+                stageBRun,
+                stageCRun,
+                stageDRun,
+                stageERun,
+                activeFlags,
+              })
+            }
+            className="px-3 py-1.5 rounded bg-slate-700 hover:bg-slate-600 text-slate-200 font-semibold text-xs transition-colors border border-slate-600"
+          >
+            <Download className="w-3 h-3.5 mr-1.5" />
+            Export Memo (.md)
+          </button>
         </div>
       </div>
 
@@ -276,7 +297,7 @@ export default function CompanyDetailPage() {
 
       {/* Tab Navigation */}
       <div className="flex gap-1 border-b border-slate-800">
-        {(['A', 'B', 'C', 'D', 'E'] as Tab[]).map((tab) => (
+        {(['A', 'B', 'C', 'D', 'E', 'F'] as Tab[]).map((tab) => (
           <button
             key={tab}
             onClick={() => setActiveTab(tab)}
@@ -350,6 +371,10 @@ export default function CompanyDetailPage() {
             // Refresh flags after a new run
           }}
         />
+      )}
+
+      {activeTab === 'F' && (
+        <FinancialsTablePanel companyId={company.id} />
       )}
 
       {/* Red Flags & Override Workflow (shared across tabs) */}

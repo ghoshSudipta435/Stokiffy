@@ -4,7 +4,7 @@ import React, { useState, useCallback, useEffect } from 'react';
 import { X, FileText, Save, AlertCircle } from 'lucide-react';
 import { useUpsertFinancials } from '@/hooks/use-manual-data';
 
-interface EditableFinancialStatement {
+export interface EditableFinancialStatement {
   periodType: 'Annual' | 'Quarterly';
   fiscalYear: string;
   fiscalQuarter: string | null;
